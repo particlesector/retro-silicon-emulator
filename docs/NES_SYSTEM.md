@@ -80,8 +80,8 @@ Use project-owned generated NROM programs and fixed expected values, not game RO
 `nes-system-tests` runs a generated NROM loop for 720,089 master ticks. An
 independent oracle constructs its reset sequence and 7,500 complete INC/JMP
 iterations: 60,007 CPU slots, RAM $10 = $4C, PC = $8000, and two published frames.
-FNV-1a hashes encode each diagnostic numeric field as eight little-endian bytes;
-the frame hash consumes palette samples. Pinned expectations are:
+FNV-1a hashes encode each numeric field, including frame palette samples, as
+eight little-endian bytes. Pinned expectations are:
 
 | Observation | Hash |
 | --- | --- |
@@ -115,3 +115,11 @@ Exit codes: 0 success, 2 arguments, 3 unsupported/malformed cartridge, 4 executi
 failure, 5 cartridge I/O failure, 6 other loading failure. Errors go to stderr.
 Unsupported CPU opcodes fail explicitly; APU/audio and desktop integration remain
 M6/M7 work.
+
+## Validation
+
+All 12 CTest suites pass in Windows/MSVC Debug and Release builds. Linux Debug,
+Release, and ASan/UBSan with leak detection also pass in
+[CI run 43572558639](https://github.com/particlesector/retro-silicon-emulator/actions/runs/43572558639).
+The CPU reference suites remain unchanged. Configure/build/test checks use the
+frontend-free configuration; desktop execution is outside M5 acceptance.
