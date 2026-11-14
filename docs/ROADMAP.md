@@ -53,19 +53,19 @@ Contract and evidence: [NES memory and cartridge loading](NES_MEMORY.md).
   mirroring, and the chosen unmapped-read and ROM-write behavior.
 - [x] Verify memory maps using synthetic fixtures without frontend dependencies.
 
-## 3. 2A03 CPU
+## 3. Reusable 6502 and Ricoh CPU variant
 
 Use a reusable NMOS 6502 engine with an explicit Ricoh variant; keep NES board
 wiring, APU, and DMA outside the instruction engine.
 Contract and reference plan: [6502 CPU](CPU_6502.md).
 
-- [ ] Implement all documented instructions, addressing modes, flags, stack
+- [x] Implement all documented instructions, addressing modes, flags, stack
   operations, reset, IRQ, and NMI, including 2A03 decimal-mode behavior.
-- [ ] Verify instruction results and timestamped bus accesses, including branch
+- [x] Verify instruction results and timestamped bus accesses, including branch
   and page-crossing timing and interrupt entry, against named reference cases.
-- [ ] Define unsupported opcode behavior explicitly; add undocumented opcodes
+- [x] Define unsupported opcode behavior explicitly; add undocumented opcodes
   only when required by the agreed MVP acceptance programs.
-- [ ] Automated tests compare CPU state and cycle counts with pinned expected
+- [x] Automated tests compare CPU state and cycle counts with pinned expected
   results and report the first mismatch.
 
 ## 4. PPU and video
