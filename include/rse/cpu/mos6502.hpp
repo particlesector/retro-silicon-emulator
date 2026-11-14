@@ -31,7 +31,8 @@ public:
     ~Mos6502();
     Mos6502(const Mos6502&) = delete;
     Mos6502& operator=(const Mos6502&) = delete;
-    // Exactly one bus cycle. Exceptions fault execution until reset().
+    // One CPU slot; granted accesses execute once, denied reads remain pending.
+    // Interrupt sampling continues during holds. Exceptions fault until reset().
     void clock();
     // Abort current work and request reset on subsequent clocks. Preserves
     // A/X/Y, decimal flag, and cycle count; decrements S three times via reads.

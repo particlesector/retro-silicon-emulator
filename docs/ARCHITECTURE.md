@@ -17,10 +17,12 @@ compatibility, workbench, diagnostics, and FPGA verification goals. The
   [6502 CPU contract](CPU_6502.md).
 - `rse_ppu2c02`: reusable NTSC PPU register, rendering, palette, and OAM model;
   external memory is supplied by the machine. See [2C02 contract](PPU_2C02.md).
+- `rse_devices`: reusable logical peripherals, including the CD4021 shift register,
+  standard controller wiring, and 2A03 OAM DMA sequencer.
 - `rse_nes` (`systems/nes`): cartridge loading, NES memory mapping, and a Ricoh CPU
-  variant adapter and PPU memory wiring; CPU/PPU timing, APU, and DMA integration
-  follow in later milestones. See
-  [NES memory and cartridge loading](NES_MEMORY.md).
+  variant adapter, PPU memory wiring, and an NTSC machine runtime with controller
+  and OAM DMA integration. See [NES memory](NES_MEMORY.md) and
+  [system timing and execution](NES_SYSTEM.md). APU/DMC integration follows in M6.
 - `rse-cli`: headless execution, tracing, snapshots and differential testing (planned).
 - `rse-desktop`: optional SDL3 window/input/audio and Vulkan renderer.
 
@@ -62,15 +64,15 @@ The UI must not drive chip internals directly. Keep host callbacks and bounded
 presentation queues outside logical simulation; define backpressure explicitly.
 Version future state/trace formats and validate compatibility before loading.
 
-## Scaffold status
-The machine advances components at each integer tick in registration order;
-see [Core timing and lifecycle](CORE_TIMING.md) for the contract and verification
-boundaries. It is **not** an NES emulator. Desktop creates a window but has no
-Vulkan swapchain or rendering yet.
+## Implementation boundaries
+The generic runtime provides the [M1 lifecycle contract](CORE_TIMING.md). The NES
+runtime owns master-clock scheduling and has verified headless execution of the
+generated NROM fixtures in [M5](NES_SYSTEM.md). This does not establish broad ROM
+compatibility. APU/audio and desktop presentation remain later work; desktop
+still creates a window without a Vulkan swapchain or frame presentation.
 
 ## Next milestone
-Follow the [MVP roadmap](ROADMAP.md): core timing and lifecycle, then the memory
-bus and cartridge loader, followed by a tested 2A03 CPU model.
+Follow the [MVP roadmap](ROADMAP.md) and its acceptance gates for remaining work.
 
 ## Simulation fidelity and execution speed
 

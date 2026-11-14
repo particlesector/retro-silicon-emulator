@@ -98,11 +98,15 @@ struct Mos6502::Impl {
         std::uint16_t address;
         std::uint8_t value{};
         bool writing{};
+        bool increment_pc{};
         bool await_ready() const noexcept { return false; }
         void await_suspend(std::coroutine_handle<>) const noexcept {
             cpu.address = address; cpu.value = value; cpu.writing = writing;
         }
-        std::uint8_t await_resume() const noexcept { return cpu.value; }
+        std::uint8_t await_resume() const noexcept {
+            if (increment_pc) ++cpu.r.pc;
+            return cpu.value;
+        }
     };
     enum class Interrupt { none, irq, nmi };
     Bus& bus;
@@ -123,6 +127,7 @@ struct Mos6502::Impl {
         r.p = (r.p | U) & ~B;
     }
     Io read(std::uint16_t a) { return {*this, a}; }
+    Io fetch() { return {*this, r.pc, 0, false, true}; }
     Io write(std::uint16_t a, std::uint8_t v) { return {*this, a, v, true}; }
     void flag(std::uint8_t mask, bool set) { r.p = set ? r.p | mask : r.p & ~mask; }
     void nz(std::uint8_t v) { flag(Z, v == 0); flag(N, (v & N) != 0); }
@@ -246,13 +251,13 @@ struct Mos6502::Impl {
         const auto interrupt = std::exchange(pending, Interrupt::none);
         const bool hardware = interrupt != Interrupt::none;
         const auto opcode_address = r.pc;
-        const auto opcode = co_await read(hardware ? r.pc : r.pc++);
+        const auto opcode = co_await (hardware ? read(r.pc) : fetch());
         const auto instruction = hardware ? Instruction{Op::BRK, Mode::imp} : instructions[opcode];
         const auto op = instruction.op;
         const auto mode = instruction.mode;
         if (op == Op::invalid) throw UnsupportedOpcode(opcode, opcode_address);
         if (op == Op::BRK) {
-            (void)co_await read(hardware ? r.pc : r.pc++);
+            (void)co_await (hardware ? read(r.pc) : fetch());
             (void)co_await write(0x100 | r.s, static_cast<std::uint8_t>(r.pc >> 8)); --r.s;
             (void)co_await write(0x100 | r.s, static_cast<std::uint8_t>(r.pc)); --r.s;
             // Vector selection precedes the status push: late NMI can redirect
@@ -269,7 +274,7 @@ struct Mos6502::Impl {
         }
         if (mode == Mode::rel) {
             poll();
-            const auto displacement = co_await read(r.pc++);
+            const auto displacement = co_await fetch();
             if (branch(op)) {
                 const int offset = displacement < 128 ? displacement : int(displacement) - 256;
                 const auto target = static_cast<std::uint16_t>(r.pc + offset);
@@ -283,7 +288,7 @@ struct Mos6502::Impl {
             co_return;
         }
         if (op == Op::JSR) {
-            const auto low = co_await read(r.pc++);
+            const auto low = co_await fetch();
             (void)co_await read(0x100 | r.s);
             (void)co_await write(0x100 | r.s, static_cast<std::uint8_t>(r.pc >> 8)); --r.s;
             (void)co_await write(0x100 | r.s, static_cast<std::uint8_t>(r.pc)); --r.s;
@@ -293,9 +298,9 @@ struct Mos6502::Impl {
             co_return;
         }
         if (op == Op::JMP) {
-            const auto low = co_await read(r.pc++);
+            const auto low = co_await fetch();
             if (mode == Mode::abs) poll();
-            const auto high = co_await read(r.pc++);
+            const auto high = co_await fetch();
             const auto pointer = static_cast<std::uint16_t>(low | (high << 8));
             if (mode == Mode::ind) {
                 const auto target_low = co_await read(pointer);
@@ -343,19 +348,24 @@ struct Mos6502::Impl {
             co_return;
         }
 
+        if (mode == Mode::imm) {
+            poll();
+            const auto operand = co_await fetch();
+            apply(op, operand);
+            co_return;
+        }
         std::uint16_t effective{};
         switch (mode) {
-        case Mode::imm: effective = r.pc++; break;
-        case Mode::zp: effective = co_await read(r.pc++); break;
+        case Mode::zp: effective = co_await fetch(); break;
         case Mode::zpx: case Mode::zpy: {
-            const auto base = co_await read(r.pc++);
+            const auto base = co_await fetch();
             (void)co_await read(base);
             effective = static_cast<std::uint8_t>(base + (mode == Mode::zpx ? r.x : r.y));
             break;
         }
         case Mode::abs: case Mode::abx: case Mode::aby: {
-            const auto low = co_await read(r.pc++);
-            const auto high = co_await read(r.pc++);
+            const auto low = co_await fetch();
+            const auto high = co_await fetch();
             const auto base = static_cast<std::uint16_t>(low | (high << 8));
             effective = static_cast<std::uint16_t>(base + (mode == Mode::abx ? r.x : mode == Mode::aby ? r.y : 0));
             if (mode != Mode::abs && (stores(op) || modifies(op) || ((base ^ effective) & 0xff00)))
@@ -363,7 +373,7 @@ struct Mos6502::Impl {
             break;
         }
         case Mode::izx: {
-            const auto base = co_await read(r.pc++);
+            const auto base = co_await fetch();
             (void)co_await read(base);
             const auto pointer = static_cast<std::uint8_t>(base + r.x);
             const auto low = co_await read(pointer);
@@ -372,7 +382,7 @@ struct Mos6502::Impl {
             break;
         }
         case Mode::izy: {
-            const auto pointer = co_await read(r.pc++);
+            const auto pointer = co_await fetch();
             const auto low = co_await read(pointer);
             const auto high = co_await read(static_cast<std::uint8_t>(pointer + 1));
             const auto base = static_cast<std::uint16_t>(low | (high << 8));
@@ -409,6 +419,13 @@ struct Mos6502::Impl {
                 task.handle.resume();
             }
             // A suspended frame describes precisely the access for this cycle.
+            if (!bus.acquire(address, writing, cycle + 1)) {
+                if (writing) throw std::logic_error("6502 writes cannot be halted");
+                ++cycle;
+                if (nmi && !last_nmi) nmi_pending = true;
+                last_nmi = nmi;
+                return;
+            }
             if (writing) bus.write(address, value, cycle + 1);
             else value = bus.read(address, cycle + 1);
             ++cycle;

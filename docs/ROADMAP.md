@@ -83,11 +83,13 @@ Contract, reference cases, and golden frames: [2C02 PPU](PPU_2C02.md).
 
 ## 5. System integration and input
 
-- [ ] Connect CPU, PPU, cartridge, and controller through the documented NTSC
+Contract, fixtures, and headless runner: [NES system integration](NES_SYSTEM.md).
+
+- [x] Connect CPU, PPU, cartridge, and controller through the documented NTSC
   clock relationship and memory map.
-- [ ] Verify OAM DMA transfers, CPU stalls, and NMI/IRQ delivery and ordering.
-- [ ] Test controller strobe and serial reads with recorded button sequences.
-- [ ] Run selected NROM programs headlessly for a fixed simulated duration;
+- [x] Verify OAM DMA transfers, CPU stalls, and NMI/IRQ delivery and ordering.
+- [x] Test controller strobe and serial reads with recorded button sequences.
+- [x] Run selected NROM programs headlessly for a fixed simulated duration;
   repeated runs produce identical state, event, and frame checksums.
 
 ## 6. APU and audio

@@ -34,7 +34,8 @@ CHR RAM starts at zero. No soft-reset memory policy is introduced in M2.
 PPU addresses are masked to 14 bits. CPU writes never change PRG ROM. CPU
 PPU-register access, APU, controllers, DMA, bus conflicts, and open-bus latches
 are not implemented here. The [2C02 chip](PPU_2C02.md) implements its own palette
-and native CPU register ports; CPU address decoding is wired in M5.
+and native CPU register ports; the [M5 machine](NES_SYSTEM.md) supplies CPU device
+decoding and an open-bus latch above this raw storage map.
 The zero-read policy is a placeholder for unconnected
 devices, not hardware open-bus behavior. Bus operations do not advance time.
 
