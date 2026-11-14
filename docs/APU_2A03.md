@@ -120,7 +120,13 @@ CMake configure/build and all 14 CTest suites pass in Debug and Release, includi
 the unchanged CPU and PPU reference suites. A Release playback run on November 14,
 2026 used the generated five-channel fixture and WASAPI for 30,000 ms, with zero
 unsatisfied SDL requests and a peak source queue of 12,844 bytes. It generated
-1,446,422 samples (including prebuffer/lookahead); the source hash was
-`69625699e7b201cc`. A prior 30-second run also reported zero starvation.
+1,445,622 samples (including prebuffer/lookahead); the source hash was
+`c9be5a38b715e684` after the divider-phase correction. Earlier 30-second runs
+also reported zero starvation.
 These are stream diagnostics; audible output was not independently assessed.
 Linux hardware playback and M7's combined frontend smoke checks are still pending.
+
+Linux Debug/Release and ASan/UBSan with leak detection pass all 14 suites in
+[CI run 43655211909](https://github.com/particlesector/retro-silicon-emulator/actions/runs/43655211909).
+Linux CI uses the frontend-free build. Windows builds include the desktop target;
+no SDL/Vulkan dependency was added to the chip, system, or CLI libraries.
