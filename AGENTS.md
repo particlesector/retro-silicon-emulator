@@ -9,3 +9,4 @@ Project: Retro Silicon Emulator (Apache-2.0).
 5. Run CMake configure, build and CTest when a build environment is available.
 6. Avoid bundling copyrighted game ROMs or proprietary firmware.
 7. Keep public interfaces documented and avoid premature plugin ABI commitments.
+8. Keep PR descriptions clean and concise: explain what changed, why, how it was tested, and any relevant limitations. Write them to work well as squash commit descriptions.
