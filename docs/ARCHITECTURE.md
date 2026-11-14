@@ -5,7 +5,9 @@ Build an accurate NES emulator first, with a reusable component-based C++23 core
 
 ## Layers
 - `rse_core`: platform-independent components, scheduler, buses, machine lifecycle and state management.
-- `systems/nes` (planned): Ricoh 2A03, PPU, APU, cartridge and mapper integration.
+- `rse_nes` (`systems/nes`): cartridge loading and NES memory mapping; Ricoh
+  2A03, PPU, APU, and device integration follow in later milestones. See
+  [NES memory and cartridge loading](NES_MEMORY.md).
 - `rse-cli`: headless execution, tracing, snapshots and differential testing (planned).
 - `rse-desktop`: optional SDL3 window/input/audio and Vulkan renderer.
 
