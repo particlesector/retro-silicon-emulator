@@ -10,3 +10,5 @@ Project: Retro Silicon Emulator (Apache-2.0).
 6. Avoid bundling copyrighted game ROMs or proprietary firmware.
 7. Keep public interfaces documented and avoid premature plugin ABI commitments.
 8. Keep PR descriptions clean and concise: explain what changed, why, how it was tested, and any relevant limitations. Write them to work well as squash commit descriptions.
+9. Build reusable components around chip-level responsibilities and explicit hardware variants. Keep board wiring, memory maps, and clock conversion in system models. Prefer the least expensive implementation that preserves tested observable behavior; profile before optimizing, and do not require signal-level simulation where it adds no verified value.
+10. Preserve the long-term goals in docs/VISION.md while using docs/ROADMAP.md for current MVP scope. Keep future directions visible without silently adding them to milestone acceptance gates.

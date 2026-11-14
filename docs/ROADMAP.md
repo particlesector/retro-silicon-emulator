@@ -1,5 +1,9 @@
 # First emulator MVP
 
+For the broader original product direction, see [Project vision](VISION.md).
+This roadmap covers the first NROM MVP; its milestone numbering supersedes the
+earlier proposal's broader release phases.
+
 ## Scope
 
 The first MVP loads supported NES cartridges and provides verified execution,
@@ -49,15 +53,19 @@ Contract and evidence: [NES memory and cartridge loading](NES_MEMORY.md).
   mirroring, and the chosen unmapped-read and ROM-write behavior.
 - [x] Verify memory maps using synthetic fixtures without frontend dependencies.
 
-## 3. 2A03 CPU
+## 3. Reusable 6502 and Ricoh CPU variant
 
-- [ ] Implement all documented instructions, addressing modes, flags, stack
+Use a reusable NMOS 6502 engine with an explicit Ricoh variant; keep NES board
+wiring, APU, and DMA outside the instruction engine.
+Contract and reference plan: [6502 CPU](CPU_6502.md).
+
+- [x] Implement all documented instructions, addressing modes, flags, stack
   operations, reset, IRQ, and NMI, including 2A03 decimal-mode behavior.
-- [ ] Verify instruction results and timestamped bus accesses, including branch
+- [x] Verify instruction results and timestamped bus accesses, including branch
   and page-crossing timing and interrupt entry, against named reference cases.
-- [ ] Define unsupported opcode behavior explicitly; add undocumented opcodes
+- [x] Define unsupported opcode behavior explicitly; add undocumented opcodes
   only when required by the agreed MVP acceptance programs.
-- [ ] Automated tests compare CPU state and cycle counts with pinned expected
+- [x] Automated tests compare CPU state and cycle counts with pinned expected
   results and report the first mismatch.
 
 ## 4. PPU and video
@@ -118,3 +126,17 @@ Contract and evidence: [NES memory and cartridge loading](NES_MEMORY.md).
   constraints, test results, and remaining limitations.
 - [ ] Keep deferred features outside the MVP release; make no NES accuracy,
   Vulkan rendering, or FPGA equivalence claims beyond recorded verification.
+
+## After the MVP
+
+Retain these directions for separately scoped follow-up milestones, rather than
+adding them to the acceptance gates above:
+
+- Broader NES compatibility: NES 2.0, MMC1/MMC3 and board variants, atomic save
+  RAM, additional regions/peripherals, and compatibility-driven unofficial opcodes.
+- Developer verification: richer headless execution/captures, versioned traces,
+  snapshots, non-mutating inspection, and a reproducible FPGA comparison workflow.
+- Proven reuse: Apple IIe, educational/custom machines, explicit CPU variants,
+  firmware/boot contracts, and validated machine manifests.
+- Visual workbench: typed connections, compatibility validation, clock/memory
+  editors, and chip/signal inspection after working machines prove the contracts.

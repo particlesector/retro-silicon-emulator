@@ -3,10 +3,20 @@
 ## Goals
 Build an accurate NES emulator first, with a reusable component-based C++23 core suitable for future historical and experimental machines. Support deterministic headless tests and comparison with Retro Silicon FPGA traces.
 
+Historical preservation and experimental computer construction are equally
+important long-term goals. The NES is the first concrete product; Apple IIe and
+custom machines should reuse chip models with explicit adapters and machine-owned
+wiring. See [Project vision](VISION.md) for the fuller product direction, component
+compatibility, workbench, diagnostics, and FPGA verification goals. The
+[MVP roadmap](ROADMAP.md) remains the authority for first MVP scope.
+
 ## Layers
 - `rse_core`: platform-independent components, scheduler, buses, machine lifecycle and state management.
-- `rse_nes` (`systems/nes`): cartridge loading and NES memory mapping; Ricoh
-  2A03, PPU, APU, and device integration follow in later milestones. See
+- `rse_cpu6502`: reusable NMOS 6502 instruction engine with explicit CPU variants,
+  independent of NES memory maps, audio, DMA, and frontend APIs. See
+  [6502 CPU contract](CPU_6502.md).
+- `rse_nes` (`systems/nes`): cartridge loading, NES memory mapping, and a Ricoh CPU
+  variant adapter; PPU, APU, and device integration follow in later milestones. See
   [NES memory and cartridge loading](NES_MEMORY.md).
 - `rse-cli`: headless execution, tracing, snapshots and differential testing (planned).
 - `rse-desktop`: optional SDL3 window/input/audio and Vulkan renderer.
@@ -15,8 +25,39 @@ Build an accurate NES emulator first, with a reusable component-based C++23 core
 - No SDL3 or Vulkan dependencies in `rse_core`.
 - Machine time is monotonic and represented using integer ticks; cross-domain clock semantics must be defined before implementing NES timing.
 - Component boundaries and bus side effects must be explicit.
+- Reusable parts follow chip-level responsibilities, with explicit variants for
+  hardware differences. Board wiring and clock conversion belong to system models.
+  Preserve tested observable behavior using the least expensive suitable model;
+  profile optimizations and add signal-level detail only where it has verified value.
 - Trace formats will specify clock domain, ordering, schema version and initial state.
 - Hardware and software models are independently implemented; shared tests and specifications provide verification.
+
+## System and application boundaries
+
+Machine definitions own device graphs, address decoding, clock ratios/phases,
+reset sequencing, interrupt routing, and DMA arbitration. The M1 registration
+order is a deterministic baseline; it does not establish hardware phase ordering.
+NES integration must define and test that ordering explicitly, including variable
+PPU frame lengths. Do not freeze a scheduler or universal chip API in advance of
+those requirements.
+
+The original NTSC proposal uses a PPU-dot timeline with three dots per CPU cycle
+and explicit rendering-time odd-frame dot skipping. Validate the ratios, phases,
+and skipped-dot handling during NES integration; use a finer master unit if needed
+to represent required edges exactly. Equal-time events need documented phases or
+priorities and a stable tie-breaker, rather than accidental container ordering.
+
+Bus/device contracts must eventually distinguish driven bits from floating bits,
+resolve open-bus values, and identify access timing, ownership, and side effects.
+The CPU bus sees the resolved byte; partially driven device results can be merged
+by the system bus. Side-effect-free inspection must not accidentally clear status
+flags or advance devices. M2's zero-read policy is a documented placeholder.
+
+Desktop and CLI should use common machine-session commands and receive frames,
+audio, diagnostics, and state/trace artifacts through an application boundary.
+The UI must not drive chip internals directly. Keep host callbacks and bounded
+presentation queues outside logical simulation; define backpressure explicitly.
+Version future state/trace formats and validate compatibility before loading.
 
 ## Scaffold status
 The machine advances components at each integer tick in registration order;
