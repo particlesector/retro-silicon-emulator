@@ -27,13 +27,15 @@ FPGA equivalence and signal-level simulation are separate future goals.
 
 ## 1. Core timing and lifecycle
 
-- [ ] Document tick units, equal-time ordering, clock-domain conversion, and
+Contract and evidence: [Core timing and lifecycle](CORE_TIMING.md).
+
+- [x] Document tick units, equal-time ordering, clock-domain conversion, and
   whether the target timestamp is included when advancing.
-- [ ] Define registration, ownership, reset, invalid input, and component failure
+- [x] Define registration, ownership, reset, invalid input, and component failure
   behavior, including the state callers may observe after a failure.
-- [ ] Test multiple components, deterministic ordering, equal timestamps, rewind
+- [x] Test multiple components, deterministic ordering, equal timestamps, rewind
   rejection, null registration, registration after advancement, and reset.
-- [ ] Repeated runs and different advancement chunk sizes produce identical
+- [x] Repeated runs and different advancement chunk sizes produce identical
   results for the same initial state and scheduled inputs.
 
 ## 2. Memory bus and cartridge loading

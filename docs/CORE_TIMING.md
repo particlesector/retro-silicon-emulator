@@ -61,3 +61,8 @@ and 2. Expected observations are (1, 4), (4, 4), (7, 2), and (10, 2), including
 same-tick writer-to-reader visibility. Both single and chunked advances, repeated
 runs, and reset/replay must match this fixed reference. These are synthetic clock
 ratios rather than NES timing evidence.
+
+M1 validation: Windows MSVC 2022 configure, build, and CTest passed in Debug
+and Release. Linux GCC Debug and Release configure, build, and CTest passed in
+[CI run 43562880847](https://github.com/particlesector/retro-silicon-emulator/actions/runs/43562880847)
+for implementation commit `555d34f`.
