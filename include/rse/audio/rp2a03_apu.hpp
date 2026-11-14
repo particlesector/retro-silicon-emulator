@@ -29,7 +29,7 @@ struct NoiseState {
     bool enabled{}, mode{};
 };
 struct DmcState {
-    std::uint16_t timer{427}, address{0xc000}, remaining{};
+    std::uint16_t timer{213}, address{0xc000}, remaining{};
     std::uint8_t control{}, address_load{}, length_load{}, output{}, buffer{}, shift{}, bits{8};
     bool buffer_full{}, silence{true}, irq{};
 };

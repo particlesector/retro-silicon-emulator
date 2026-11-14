@@ -8,6 +8,10 @@ The system clocks the APU before the CPU bus access; register writes therefore
 take effect after that slot's channel/frame clocks. Native register offsets
 are $00-$13, $15 and $17; console address decoding belongs to the system.
 Power-on is deterministic, not a claim about analog startup state.
+Pulse/noise/DMC timers advance only on the supplied get phase; triangle advances
+on every slot. Noise/DMC diagnostic timer values count APU ticks (half the
+published CPU-period tables). The initial DMC divider is 213, giving its first
+output tick on the 214th get phase; the frame sequence starts at cycle zero.
 
 Before implementation, the acceptance cases are named as follows:
 
@@ -64,7 +68,7 @@ for headless runs. Capture/drain settings never change chip clocks, DMA, or CPU
 execution. Reset clears PCM filter phase and queued samples as well as the APU.
 
 `nes-audio-tests` runs a generated five-channel NROM program for 2,000,000
-master ticks. It produces 4,469 samples with FNV-1a hash `2d00e48eeaf61095`
+master ticks. It produces 4,469 samples with FNV-1a hash `21e6c536d9b67d48`
 (two little-endian bytes per signed sample). This is a regression capture,
 separate from the independently specified channel/counter cases. Repeated,
 chunked, drained, and reset runs must match; capture-disabled runs must preserve

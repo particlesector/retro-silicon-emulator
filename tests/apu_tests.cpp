@@ -99,9 +99,9 @@ void dmc_reader() {
     a.accept_dma(0xff);check(a.state().dmc.remaining==1 && !a.irq_asserted(),"DMC loop restart");
     to(a,a.state().cycles+1000);check(a.output().dmc<=127,"DMC saturation");
     Rp2a03Apu bits;bits.write(16,15);bits.write(17,64);bits.write(21,16);to(bits,3);bits.accept_dma(0x05);
-    // Initial 428-cycle timer, then seven silent 54-cycle ticks load the byte.
-    to(bits,806);check(!bits.state().dmc.silence && bits.state().dmc.shift==5,"DMC buffer transfer boundary");
-    for (auto [time,value]:{std::pair{860,66},std::pair{914,64},std::pair{968,66},std::pair{1022,64}}) {
+    // Initial 214 APU ticks, then seven silent 27-APU-tick intervals load the byte.
+    to(bits,805);check(!bits.state().dmc.silence && bits.state().dmc.shift==5,"DMC buffer transfer boundary");
+    for (auto [time,value]:{std::pair{859,66},std::pair{913,64},std::pair{967,66},std::pair{1021,64}}) {
         to(bits,time);check(bits.output().dmc==value,"DMC LSB-first deltas/rate");
     }
     bits.write(16,0);check(!bits.irq_asserted(),"DMC IRQ disable");
@@ -111,13 +111,23 @@ void period_tables_and_gates() {
     constexpr unsigned dmc[]{428,380,340,320,286,254,226,214,190,160,142,128,106,84,72,54};
     for (unsigned rate=0;rate<16;++rate) {
         Rp2a03Apu a;a.write(14,static_cast<std::uint8_t>(rate));a.write(16,static_cast<std::uint8_t>(rate));
-        to(a,1);check(a.state().noise.timer==noise[rate]-1,"noise period table reload");
+        to(a,1);check(a.state().noise.timer==noise[rate]/2-1,"noise period table reload");
         const auto shift=a.state().noise.shift;to(a,noise[rate]);check(a.state().noise.shift==shift,"noise period early clock");
         to(a,noise[rate]+1);check(a.state().noise.shift!=shift,"noise period missing clock");
-        Rp2a03Apu b;b.write(16,static_cast<std::uint8_t>(rate));to(b,428);
-        check(b.state().dmc.timer==dmc[rate]-1 && b.state().dmc.bits==7,"DMC period table reload");
-        to(b,428+dmc[rate]-1);check(b.state().dmc.bits==7,"early DMC timer");
-        to(b,428+dmc[rate]);check(b.state().dmc.bits==6,"DMC timer interval");
+        Rp2a03Apu b;b.write(16,static_cast<std::uint8_t>(rate));to(b,427);
+        check(b.state().dmc.timer==dmc[rate]/2-1 && b.state().dmc.bits==7,"DMC period table reload");
+        to(b,427+dmc[rate]-1);check(b.state().dmc.bits==7,"early DMC timer");
+        to(b,427+dmc[rate]);check(b.state().dmc.bits==6,"DMC timer interval");
+    }
+    for (bool odd:{false,true}) {
+        Rp2a03Apu phased;
+        for (unsigned cycle=1;cycle<=860;++cycle) {
+            const auto before=phased.state();const bool get=bool(cycle&1)==odd;
+            phased.clock(get);
+            if (!get) check(phased.state().noise.timer==before.noise.timer && phased.state().dmc.timer==before.dmc.timer &&
+                            phased.state().noise.shift==before.noise.shift && phased.state().dmc.bits==before.dmc.bits,
+                            "noise/DMC advanced on put phase");
+        }
     }
     Rp2a03Apu halted;halted.write(21,15);
     for (auto base:{0,4,12}) {halted.write(base,0x20);halted.write(base+3,0);}

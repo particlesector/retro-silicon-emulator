@@ -97,17 +97,18 @@ void Rp2a03Apu::clock(bool get_phase) {
             else { p.timer=p.period; p.phase=(p.phase+1)&7; }
         }
     }
+    if (!get_) return; // Noise and DMC dividers share the APU half-rate clock.
     auto& n=state_.noise;
     if (n.timer) --n.timer;
     else {
-        n.timer=noise_periods[n.period]-1;
+        n.timer=noise_periods[n.period]/2-1;
         const auto feedback=(n.shift^(n.shift>>(n.mode?6:1)))&1;
         n.shift=static_cast<std::uint16_t>((n.shift>>1)|(feedback<<14));
     }
     auto& d=state_.dmc;
     if (d.timer) --d.timer;
     else {
-        d.timer=dmc_periods[d.control&15]-1;
+        d.timer=dmc_periods[d.control&15]/2-1;
         if (!d.silence) {
             if ((d.shift&1) && d.output<=125) d.output+=2;
             else if (!(d.shift&1) && d.output>=2) d.output-=2;

@@ -21,7 +21,7 @@ void repeat(bool print) {
     if (print) {std::cout<<"samples "<<expected.size()<<" hash "<<std::hex<<hash(expected)<<'\n';return;}
     check(expected.size()==4469,"PCM rational sample count");
     // Fixed regression capture; channel timing is checked independently in apu-tests.
-    check(hash(expected)==0x2d00e48eeaf61095ull,"PCM golden mismatch");
+    check(hash(expected)==0x21e6c536d9b67d48ull,"PCM golden mismatch");
     check(std::any_of(expected.begin(),expected.end(),[](auto s){return s>1000;}),"silent PCM fixture");
     for (unsigned run=0;run<3;++run) {
         Machine replay(cartridge,Profile{.trace=true,.capture_audio=true});
