@@ -17,10 +17,14 @@ Build an accurate NES emulator first, with a reusable component-based C++23 core
 - Hardware and software models are independently implemented; shared tests and specifications provide verification.
 
 ## Scaffold status
-The current machine simply advances placeholder components to a requested tick. It is **not** a cycle-accurate scheduler or an NES emulator. Desktop creates a window but has no Vulkan swapchain or rendering yet.
+The machine advances components at each integer tick in registration order;
+see [Core timing and lifecycle](CORE_TIMING.md) for the contract and verification
+boundaries. It is **not** an NES emulator. Desktop creates a window but has no
+Vulkan swapchain or rendering yet.
 
 ## Next milestone
-Define scheduler semantics, bus transactions, component lifecycle and error handling; then implement a tested 2A03 CPU model.
+Follow the [MVP roadmap](ROADMAP.md): core timing and lifecycle, then the memory
+bus and cartridge loader, followed by a tested 2A03 CPU model.
 
 ## Simulation fidelity and execution speed
 
