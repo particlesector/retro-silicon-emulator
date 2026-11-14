@@ -29,11 +29,13 @@ CHR RAM starts at zero. No soft-reset memory policy is introduced in M2.
 | PPU `$0000-$1FFF` | CHR ROM (writes ignored) or writable CHR RAM |
 | PPU `$2000-$2FFF` | 2 KiB nametable RAM; horizontal `[A,A,B,B]`, vertical `[A,B,A,B]` |
 | PPU `$3000-$3EFF` | Mirror of `$2000-$2EFF` |
-| PPU `$3F00-$3FFF` | Reads return zero; writes ignored (palette deferred to M4) |
+| PPU `$3F00-$3FFF` | External bus reads zero/writes ignored; palette RAM is inside the PPU chip |
 
 PPU addresses are masked to 14 bits. CPU writes never change PRG ROM. CPU
 PPU-register access, APU, controllers, DMA, bus conflicts, and open-bus latches
-are not implemented here. The zero-read policy is a placeholder for unconnected
+are not implemented here. The [2C02 chip](PPU_2C02.md) implements its own palette
+and native CPU register ports; CPU address decoding is wired in M5.
+The zero-read policy is a placeholder for unconnected
 devices, not hardware open-bus behavior. Bus operations do not advance time.
 
 ## Reference and acceptance tests

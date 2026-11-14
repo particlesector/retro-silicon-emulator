@@ -21,7 +21,7 @@ public:
     }
     [[nodiscard]] std::uint8_t cpu_read(std::uint16_t address) noexcept;
     void cpu_write(std::uint16_t address, std::uint8_t value) noexcept;
-    // PPU addresses wrap at 14 bits. Palette storage is deferred to the PPU.
+    // External PPU memory wraps at 14 bits. Palette storage is chip-local.
     [[nodiscard]] std::uint8_t ppu_read(std::uint16_t address) noexcept;
     void ppu_write(std::uint16_t address, std::uint8_t value) noexcept;
 private:

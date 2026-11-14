@@ -70,13 +70,15 @@ Contract and reference plan: [6502 CPU](CPU_6502.md).
 
 ## 4. PPU and video
 
-- [ ] Implement CPU-visible registers, VRAM/OAM access, scrolling, background and
+Contract, reference cases, and golden frames: [2C02 PPU](PPU_2C02.md).
+
+- [x] Implement CPU-visible registers, VRAM/OAM access, scrolling, background and
   sprite output, palette selection, and supported mirroring behavior.
-- [ ] Test sprite priority, sprite-zero hit, sprite overflow behavior, vblank,
+- [x] Test sprite priority, sprite-zero hit, sprite overflow behavior, vblank,
   NMI generation, and register side effects at defined timing boundaries.
-- [ ] Verify frame timing and selected register/bus events against reference
+- [x] Verify frame timing and selected register/bus events against reference
   cases, including rendering-time register writes.
-- [ ] Produce deterministic frames in headless tests and compare selected frame
+- [x] Produce deterministic frames in headless tests and compare selected frame
   hashes against recorded expected output with a fixed palette.
 
 ## 5. System integration and input
