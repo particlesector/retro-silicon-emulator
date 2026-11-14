@@ -61,7 +61,7 @@ std::vector<TraceEvent> loop_oracle() {
         {1,TraceKind::input,0,0x81,0},{100,TraceKind::irq,0,1,0},
         {500,TraceKind::input,0,2,0},{500,TraceKind::input,0,0xa5,0},
         {1000,TraceKind::irq,0,0,0},{200000,TraceKind::input,0,0x18,0},
-        {330096,TraceKind::frame,0,1,0},{600000,TraceKind::input,0,0x80,0},
+        {330096,TraceKind::frame,0,1,0},{357936,TraceKind::apu_irq,0,1,0},{600000,TraceKind::input,0,0x80,0},
         {687464,TraceKind::frame,0,2,0}};
     const std::array<unsigned,7> reset_addresses{0,0,0x100,0x1ff,0x1fe,0xfffc,0xfffd};
     std::vector<TraceEvent> result;
@@ -98,7 +98,7 @@ std::uint64_t loop_state_oracle() {
     return observation_hash(s,memory);
 }
 // Populated from --print-goldens, which runs only the independent loop oracle.
-constexpr std::uint64_t golden_loop_events=0xfc34a569a9f0d2ebull;
+constexpr std::uint64_t golden_loop_events=0x2131961d8dc21ff1ull;
 constexpr std::uint64_t golden_loop_state=0x69f1cb6cc7e11967ull;
 constexpr std::uint64_t golden_blank_frame=0xcf28946e7ff82325ull;
 void compare_events(std::span<const TraceEvent> actual,std::span<const TraceEvent> expected) {
@@ -161,7 +161,7 @@ void clocks_and_failures() {
     NesProgram bad; bad.emit({2}); Machine unsupported(bad.cartridge());
     rejects<UnsupportedOpcode>([&] { unsupported.advance_to(120); });
     check(unsupported.state().faulted,"CPU exception must fault the machine");
-    rejects<std::logic_error>([&] { unsupported.run_frame(); });
+    rejects<std::logic_error>([&] { (void)unsupported.run_frame(); });
     unsupported.reset(); check(unsupported.state().cpu_cycles==0 && !unsupported.state().faulted,"CPU fault reset recovery");
 }
 void memory_decode() {

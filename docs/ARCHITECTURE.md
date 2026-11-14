@@ -17,12 +17,15 @@ compatibility, workbench, diagnostics, and FPGA verification goals. The
   [6502 CPU contract](CPU_6502.md).
 - `rse_ppu2c02`: reusable NTSC PPU register, rendering, palette, and OAM model;
   external memory is supplied by the machine. See [2C02 contract](PPU_2C02.md).
+- `rse_apu2a03`: reusable NTSC 2A03 sound circuitry, channel DAC outputs, IRQ,
+  and sample-reader requests; no console memory or host audio API. A separate
+  integer PCM converter produces 48 kHz source audio. See [APU contract](APU_2A03.md).
 - `rse_devices`: reusable logical peripherals, including the CD4021 shift register,
-  standard controller wiring, and 2A03 OAM DMA sequencer.
+  standard controller wiring, and 2A03 OAM/DMC DMA arbitration.
 - `rse_nes` (`systems/nes`): cartridge loading, NES memory mapping, and a Ricoh CPU
   variant adapter, PPU memory wiring, and an NTSC machine runtime with controller
-  and OAM DMA integration. See [NES memory](NES_MEMORY.md) and
-  [system timing and execution](NES_SYSTEM.md). APU/DMC integration follows in M6.
+  and OAM/DMC DMA, APU IRQ routing, and bounded audio capture. See
+  [NES memory](NES_MEMORY.md) and [system timing and execution](NES_SYSTEM.md).
 - `rse-cli`: headless execution, tracing, snapshots and differential testing (planned).
 - `rse-desktop`: optional SDL3 window/input/audio and Vulkan renderer.
 
@@ -68,8 +71,9 @@ Version future state/trace formats and validate compatibility before loading.
 The generic runtime provides the [M1 lifecycle contract](CORE_TIMING.md). The NES
 runtime owns master-clock scheduling and has verified headless execution of the
 generated NROM fixtures in [M5](NES_SYSTEM.md). This does not establish broad ROM
-compatibility. APU/audio and desktop presentation remain later work; desktop
-still creates a window without a Vulkan swapchain or frame presentation.
+compatibility. [APU/audio](APU_2A03.md) includes deterministic PCM and SDL playback.
+Desktop still creates a window without a Vulkan swapchain or frame presentation;
+combined video/audio pacing and input UI remain M7 work.
 
 ## Next milestone
 Follow the [MVP roadmap](ROADMAP.md) and its acceptance gates for remaining work.

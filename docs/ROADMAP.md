@@ -94,13 +94,15 @@ Contract, fixtures, and headless runner: [NES system integration](NES_SYSTEM.md)
 
 ## 6. APU and audio
 
-- [ ] Implement pulse, triangle, noise, and DMC channels, register behavior,
+Contract, reference cases, and playback checks: [2A03 APU](APU_2A03.md).
+
+- [x] Implement pulse, triangle, noise, and DMC channels, register behavior,
   frame sequencing, and audio mixing.
-- [ ] Test channel timing, frame/DMC interrupts, sample fetching, CPU stalls,
+- [x] Test channel timing, frame/DMC interrupts, sample fetching, CPU stalls,
   and interactions with OAM DMA using named reference cases.
-- [ ] Generate deterministic audio samples for fixed initial state and inputs
+- [x] Generate deterministic audio samples for fixed initial state and inputs
   at a documented sample rate; compare with recorded expected results.
-- [ ] Desktop audio plays continuously in the agreed smoke-test session without
+- [x] Desktop audio plays continuously in the agreed smoke-test session without
   sustained underruns; host audio timing does not change simulated execution.
 
 ## 7. Desktop MVP

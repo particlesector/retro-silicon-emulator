@@ -63,4 +63,5 @@ The Ninja preset also works on Windows from a Visual Studio Developer PowerShell
 
 See [Architecture](docs/ARCHITECTURE.md) for the project structure and
 [Headless execution](docs/NES_SYSTEM.md#headless-runner) for CLI usage.
+See [Audio playback](docs/APU_2A03.md#desktop-playback) for desktop audio commands.
 Licensed under [Apache-2.0](LICENSE).

@@ -22,7 +22,7 @@ OAM DMA halts the next CPU read after $4014, optionally aligns to a get phase,
 then performs 256 get/put pairs. All accesses use the ordinary mapped bus, including
 halt/alignment repeats and $2004 writes. Consecutive $4014 writes select the last
 page before the halt. Get/put power-on phase is a reproducible profile option.
-DMC arbitration is M6 work.
+DMC arbitration and audio are documented in [2A03 APU](APU_2A03.md).
 
 The standard controller uses a separate CD4021 model. Button bits are A, B,
 Select, Start, Up, Down, Left, Right from bit 0 through bit 7. Strobe-high loads
@@ -39,8 +39,8 @@ CPU RAM and NROM retain the M2 map. $2000-$3FFF mirrors native PPU registers;
 $4014 requests OAM DMA and $4016 strobes/reads controller 1. Unconnected controller
 port 2 drives zero on its low lines. Unmapped reads retain the CPU bus latch;
 controller reads use NES-001 wiring: bits 0-4 driven, latched high bits retained.
-NES-101/Famicom port differences are not implied. APU registers are
-unconnected until M6. The external PPU bus still owns cartridge/nametable memory;
+NES-101/Famicom port differences are not implied. $4000-$4013, $4015 and writes
+to $4017 connect the APU; $4015 preserves CPU-latch bit 5. The external PPU bus still owns cartridge/nametable memory;
 palette and OAM remain inside the PPU.
 
 Inspection of CPU RAM/PRG and chip diagnostic state is non-mutating. It must not
@@ -85,7 +85,7 @@ eight little-endian bytes. Pinned expectations are:
 
 | Observation | Hash |
 | --- | --- |
-| Ordered events | `fc34a569a9f0d2eb` |
+| Ordered events | `2131961d8dc21ff1` |
 | Machine state | `69f1cb6cc7e11967` |
 | Blank frame | `cf28946e7ff82325` |
 
@@ -94,6 +94,9 @@ scheduled controller input in NMI handlers. It checks captured values $A5/$3C,
 eight serial reads per sample, and a uniform $21 frame. Repeated, reset, and
 chunked runs compare full observations. Fixtures are project-owned source code;
 these checks establish the listed behavior, not broad game compatibility.
+The event oracle includes the APU's power-on four-step frame IRQ at tick 357,936;
+the loop keeps IRQ masked. The video/input fixture also leaves IRQ masked so it
+continues to isolate NMI-driven sampling. Earlier M5 captures predated APU wiring.
 
 ## Headless runner
 
@@ -113,8 +116,8 @@ Success prints one JSON record with format `rse.run.v1`, elapsed master `ticks`,
 `cpu_cycles` (including DMA holds), published `frames`, and decimal `pc`.
 Exit codes: 0 success, 2 arguments, 3 unsupported/malformed cartridge, 4 execution
 failure, 5 cartridge I/O failure, 6 other loading failure. Errors go to stderr.
-Unsupported CPU opcodes fail explicitly; APU/audio and desktop integration remain
-M6/M7 work.
+Unsupported CPU opcodes fail explicitly. Audio capture/playback is described in
+[2A03 APU](APU_2A03.md); desktop video integration remains M7 work.
 
 ## Validation
 

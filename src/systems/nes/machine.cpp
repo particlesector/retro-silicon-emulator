@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 #include <rse/systems/nes/machine.hpp>
 #include <rse/systems/nes/bus.hpp>
+#include <rse/audio/pcm.hpp>
+#include <rse/devices/rp2a03_dma.hpp>
 #include <algorithm>
 #include <limits>
 #include <stdexcept>
@@ -14,33 +16,51 @@ struct Machine::Impl {
         explicit CpuConnection(Impl& owner) : system(owner) {}
         bool acquire(std::uint16_t address, bool writing, std::uint64_t cycle) override {
             const bool get = bool(cycle & 1) == system.profile.dma_get_on_odd;
-            const auto action = system.dma.clock(writing,address,get);
+            const auto arbitration = system.dma.clock(writing,address,get,system.apu.dma_request());
+            using devices::DmcKind;
+            if (arbitration.dmc==DmcKind::get) {
+                const auto value=system.read_memory(arbitration.address);
+                system.apu.accept_dma(value);
+                system.record(TraceKind::dmc_get,arbitration.address,value,cycle);
+                system.route_irq(); return false;
+            }
+            const auto action=arbitration.oam;
             using devices::DmaKind;
-            if (action.kind == DmaKind::cpu) return true;
+            if (action.kind == DmaKind::cpu) {
+                if (arbitration.dmc==DmcKind::none) return true;
+                const auto value=system.read_memory(arbitration.address);
+                const auto kind=arbitration.dmc==DmcKind::halt ? TraceKind::dmc_halt :
+                    arbitration.dmc==DmcKind::dummy ? TraceKind::dmc_dummy : TraceKind::dmc_align;
+                system.record(kind,arbitration.address,value,cycle);
+                system.route_nmi(); system.route_irq(); return false;
+            }
             std::uint8_t value = action.data;
             TraceKind kind;
             switch (action.kind) {
             case DmaKind::halt: kind=TraceKind::dma_halt; value=system.read_memory(action.address); break;
             case DmaKind::align: kind=TraceKind::dma_align; value=system.read_memory(action.address); break;
             case DmaKind::get:
-                kind=TraceKind::dma_get; value=system.read_memory(action.address); system.dma.accept(value); break;
+                kind=TraceKind::dma_get; value=system.read_memory(action.address); system.dma.accept_oam(value); break;
             case DmaKind::put: kind=TraceKind::dma_put; system.write_memory(action.address,value); break;
             default: throw std::logic_error("invalid DMA action");
             }
             system.record(kind,action.address,value,cycle);
             system.route_nmi();
+            system.route_irq();
             return false;
         }
         std::uint8_t read(std::uint16_t address, std::uint64_t cycle) override {
             const auto value=system.read_memory(address);
             system.record(TraceKind::cpu_read,address,value,cycle);
             system.route_nmi();
+            system.route_irq();
             return value;
         }
         void write(std::uint16_t address, std::uint8_t value, std::uint64_t cycle) override {
             system.write_memory(address,value);
             system.record(TraceKind::cpu_write,address,value,cycle);
             system.route_nmi();
+            system.route_irq();
         }
     };
     struct PpuConnection final : video::PpuBus {
@@ -61,7 +81,10 @@ struct Machine::Impl {
     Profile profile;
     Bus memory;
     devices::NesController controller;
-    devices::Rp2a03OamDma dma;
+    devices::Rp2a03Dma dma;
+    audio::Rp2a03Apu apu;
+    audio::NtscPcm pcm;
+    std::vector<std::int16_t> samples;
     CpuConnection cpu_bus;
     PpuConnection ppu_bus;
     Cpu cpu;
@@ -69,7 +92,7 @@ struct Machine::Impl {
     Tick tick{}, active_tick{};
     std::optional<Tick> next_ppu, next_cpu;
     std::uint8_t latch{};
-    bool irq{}, nmi{}, faulted{};
+    bool irq{}, nmi{}, apu_irq{}, faulted{};
     std::vector<Scheduled> scheduled;
     std::size_t next_event{};
     std::vector<TraceEvent> events;
@@ -77,7 +100,8 @@ struct Machine::Impl {
     Impl(Cartridge cartridge, Profile configuration)
         : profile(configuration), memory(std::move(cartridge)), cpu_bus(*this), ppu_bus(*this),
           cpu(cpu_bus), ppu(ppu_bus) {
-        if (profile.ppu_phase>=4 || profile.cpu_phase>=12 || (profile.trace && !profile.trace_limit))
+        if (profile.ppu_phase>=4 || profile.cpu_phase>=12 || (profile.trace && !profile.trace_limit) ||
+            (profile.capture_audio && !profile.audio_limit))
             throw std::invalid_argument("invalid NES clock/trace profile");
         next_ppu=profile.ppu_phase ? profile.ppu_phase : 4;
         next_cpu=profile.cpu_phase ? profile.cpu_phase : 12;
@@ -95,10 +119,16 @@ struct Machine::Impl {
         if (level!=nmi) { nmi=level; record(TraceKind::nmi,0,level); }
         cpu.set_nmi(level);
     }
+    void route_irq() {
+        const auto level=apu.irq_asserted();
+        if (level!=apu_irq) { apu_irq=level; record(TraceKind::apu_irq,0,level); }
+        cpu.set_irq(irq || apu_irq);
+    }
     std::uint8_t read_memory(std::uint16_t address) {
         std::uint8_t value=latch;
         if (address<0x2000 || address>=0x8000) value=memory.cpu_read(address);
         else if (address<0x4000) value=ppu.cpu_read(address & 7);
+        else if (address==0x4015) value=(latch&0x20)|apu.read_status();
         else if (address==0x4016) value=(latch & 0xe0) | std::uint8_t(!controller.read());
         else if (address==0x4017) value=latch & 0xe0;
         latch=value;
@@ -108,8 +138,9 @@ struct Machine::Impl {
         latch=value;
         if (address<0x2000) memory.cpu_write(address,value);
         else if (address<0x4000) ppu.cpu_write(address & 7,value);
-        else if (address==0x4014) dma.request(value);
+        else if (address==0x4014) dma.request_oam(value);
         else if (address==0x4016) controller.strobe(value & 1);
+        else if (address<=0x4013 || address==0x4015 || address==0x4017) apu.write(address&0x1f,value);
     }
     void schedule(Tick when, ScheduledKind kind, std::uint8_t data) {
         healthy();
@@ -142,7 +173,7 @@ struct Machine::Impl {
                         controller.set_buttons(event.data);
                         record(TraceKind::input,0,event.data);
                     } else {
-                        irq=event.data!=0; cpu.set_irq(irq);
+                        irq=event.data!=0; route_irq();
                         record(TraceKind::irq,0,irq);
                     }
                 }
@@ -154,7 +185,16 @@ struct Machine::Impl {
                     if (ppu.frame().number!=frames) record(TraceKind::frame,0,ppu.frame().number);
                 }
                 if (next_cpu && *next_cpu==next) {
+                    const auto cycle=cpu.cycles()+1;
+                    apu.clock(bool(cycle&1)==profile.dma_get_on_odd);
+                    route_irq();
                     cpu.clock();
+                    if (profile.capture_audio) {
+                        if (const auto sample=pcm.clock(apu.output())) {
+                            if (samples.size()==profile.audio_limit) throw std::length_error("NES audio queue limit exceeded");
+                            samples.push_back(*sample);
+                        }
+                    }
                     increment(next_cpu,12);
                 }
                 tick=next;
@@ -181,7 +221,7 @@ void Machine::schedule_input(Tick tick,std::uint8_t buttons) { impl_->schedule(t
 void Machine::schedule_irq(Tick tick,bool asserted) { impl_->schedule(tick,Impl::ScheduledKind::irq,asserted); }
 MachineState Machine::state() const noexcept {
     return {impl_->tick,impl_->cpu.state(),impl_->ppu.state(),impl_->cpu.cycles(),impl_->latch,
-        impl_->controller.buttons(),impl_->controller.state(),impl_->dma.state(),
+        impl_->controller.buttons(),impl_->controller.state(),impl_->dma.oam_state(),
         impl_->cpu.at_instruction_boundary(),impl_->irq,impl_->nmi,impl_->faulted};
 }
 const video::PpuFrame& Machine::frame() const noexcept { return impl_->ppu.frame(); }
@@ -190,4 +230,6 @@ std::optional<std::uint8_t> Machine::inspect_memory(std::uint16_t address) const
     return std::nullopt;
 }
 std::span<const TraceEvent> Machine::trace() const noexcept { return impl_->events; }
+audio::ApuState Machine::apu_state() const noexcept { return impl_->apu.state(); }
+std::vector<std::int16_t> Machine::take_audio() { std::vector<std::int16_t> result; result.swap(impl_->samples); return result; }
 } // namespace rse::nes

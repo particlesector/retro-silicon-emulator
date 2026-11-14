@@ -14,7 +14,7 @@ struct OamDmaState {
 };
 // 2A03 OAM DMA sequencing, independent of machine memory/scheduler. The caller
 // supplies get/put clock phase, executes actions on the mapped bus, and returns
-// each get result via accept(). DMC contention is added with the APU in M6.
+// each get result via accept(). Rp2a03Dma adds DMC contention around this unit.
 class Rp2a03OamDma {
 public:
     void request(std::uint8_t page) {
