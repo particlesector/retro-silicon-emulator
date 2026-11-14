@@ -55,3 +55,9 @@ Implementation and fixtures are project-owned; no external ROM assets are used.
 
 Tests compare generated patterns and fixed expected values in Debug and Release.
 Passing these cases verifies this memory subset, not NES execution or timing.
+
+M2 validation: Windows MSVC 2022 configure, build, and both CTest suites passed
+in Debug and Release. Linux GCC Debug and Release configure, build, and both
+CTest suites passed in
+[CI run 43563914794](https://github.com/particlesector/retro-silicon-emulator/actions/runs/43563914794)
+for implementation commit `4979647`.

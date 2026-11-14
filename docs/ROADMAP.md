@@ -40,12 +40,14 @@ Contract and evidence: [Core timing and lifecycle](CORE_TIMING.md).
 
 ## 2. Memory bus and cartridge loading
 
-- [ ] Parse supported iNES mapper 0 images with bounded reads and explicit size
+Contract and evidence: [NES memory and cartridge loading](NES_MEMORY.md).
+
+- [x] Parse supported iNES mapper 0 images with bounded reads and explicit size
   validation; document handling of trainers, flags, and unsupported variants.
-- [ ] Reject malformed, truncated, and unsupported cartridges with clear errors.
-- [ ] Test CPU RAM mirroring, NROM PRG mapping, CHR ROM/RAM access, nametable
+- [x] Reject malformed, truncated, and unsupported cartridges with clear errors.
+- [x] Test CPU RAM mirroring, NROM PRG mapping, CHR ROM/RAM access, nametable
   mirroring, and the chosen unmapped-read and ROM-write behavior.
-- [ ] Verify memory maps using synthetic fixtures without frontend dependencies.
+- [x] Verify memory maps using synthetic fixtures without frontend dependencies.
 
 ## 3. 2A03 CPU
 
