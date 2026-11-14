@@ -95,3 +95,12 @@ oracle. Normal tests compare both the oracle and actual output to these pinned
 values, verify every pixel, and repeat after reset. They also retain a published
 frame while the other buffer draws. Expected frame lengths are 89,342 dots and
 89,341 on odd rendered frames; blank frames do not skip a dot.
+
+M4 validation for implementation commit `e69d2db`: Windows MSVC 2022 and Linux
+GCC configure, Debug/Release builds, and all eight CTest suites pass. The eight
+golden scenes pass per-pixel checks and reset replay, alongside the named
+register, frame/fetch timing, sprite, and NROM memory-wiring cases. Linux address,
+leak, and undefined-behavior sanitizers pass in
+[CI run 43569186047](https://github.com/particlesector/retro-silicon-emulator/actions/runs/43569186047).
+These results cover the declared dot-level contract, not the excluded silicon
+effects or a complete CPU/PPU-integrated NES.
