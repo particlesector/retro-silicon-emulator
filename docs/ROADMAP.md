@@ -94,6 +94,8 @@ Contract, fixtures, and headless runner: [NES system integration](NES_SYSTEM.md)
 
 ## 6. APU and audio
 
+Contract, reference cases, and playback checks: [2A03 APU](APU_2A03.md).
+
 - [ ] Implement pulse, triangle, noise, and DMC channels, register behavior,
   frame sequencing, and audio mixing.
 - [ ] Test channel timing, frame/DMC interrupts, sample fetching, CPU stalls,

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 #include <rse/core/component.hpp>
+#include <rse/audio/rp2a03_apu.hpp>
 #include <rse/devices/nes_controller.hpp>
 #include <rse/devices/rp2a03_oam_dma.hpp>
 #include <rse/systems/nes/cartridge.hpp>
@@ -10,6 +11,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <vector>
 
 namespace rse::nes {
 struct Profile {
@@ -19,10 +21,13 @@ struct Profile {
     bool dma_get_on_odd{true};
     bool trace{};
     std::size_t trace_limit{1'000'000};
+    bool capture_audio{};
+    std::size_t audio_limit{48'000};
 };
 enum class TraceKind : std::uint8_t {
     cpu_read, cpu_write, dma_halt, dma_align, dma_get, dma_put,
-    ppu_read, ppu_write, nmi, irq, input, frame
+    ppu_read, ppu_write, nmi, irq, input, frame,
+    apu_irq, dmc_halt, dmc_dummy, dmc_align, dmc_get
 };
 struct TraceEvent {
     Tick tick{};
@@ -64,6 +69,9 @@ public:
     [[nodiscard]] std::optional<std::uint8_t> inspect_memory(std::uint16_t address) const noexcept;
     // Diagnostic views, invalidated by advance/reset. No frozen trace-file ABI.
     [[nodiscard]] std::span<const TraceEvent> trace() const noexcept;
+    [[nodiscard]] audio::ApuState apu_state() const noexcept;
+    // 48 kHz mono signed 16-bit PCM. Draining affects no emulated state.
+    [[nodiscard]] std::vector<std::int16_t> take_audio();
 private:
     struct Impl;
     Cartridge initial_;
