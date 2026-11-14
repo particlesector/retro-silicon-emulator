@@ -61,5 +61,6 @@ same preset commands above, then run `./build/dev/rse-desktop`.
 
 The Ninja preset also works on Windows from a Visual Studio Developer PowerShell.
 
-See [Architecture](docs/ARCHITECTURE.md) for the project structure.
+See [Architecture](docs/ARCHITECTURE.md) for the project structure and
+[Headless execution](docs/NES_SYSTEM.md#headless-runner) for CLI usage.
 Licensed under [Apache-2.0](LICENSE).

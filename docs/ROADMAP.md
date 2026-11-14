@@ -83,6 +83,8 @@ Contract, reference cases, and golden frames: [2C02 PPU](PPU_2C02.md).
 
 ## 5. System integration and input
 
+Contract, fixtures, and headless runner: [NES system integration](NES_SYSTEM.md).
+
 - [ ] Connect CPU, PPU, cartridge, and controller through the documented NTSC
   clock relationship and memory map.
 - [ ] Verify OAM DMA transfers, CPU stalls, and NMI/IRQ delivery and ordering.

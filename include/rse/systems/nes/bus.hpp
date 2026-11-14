@@ -7,8 +7,9 @@
 #include <cstdint>
 
 namespace rse::nes {
-// Owns a cartridge and zero-initialized CPU/nametable RAM. Unconnected devices
-// return zero; no bus timing or register side effects yet. See NES_MEMORY.md.
+// Raw cartridge and zero-initialized CPU/nametable storage. Unmapped accesses
+// here return zero; Machine owns device decoding, timing, and CPU open bus.
+// See NES_MEMORY.md and NES_SYSTEM.md.
 class Bus : public CpuBus {
 public:
     explicit Bus(Cartridge cartridge);

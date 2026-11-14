@@ -12,7 +12,8 @@ Frame buffers are output captures, not emulated addressable chip memory.
 `clock()` processes the position returned by `state()` and advances one PPU dot.
 Register accesses occur between clocks, at the current completed-dot timestamp.
 The native register selector decodes its low three bits; NES CPU address decoding
-and CPU/PPU phase conversion remain M5 work. External fetches report the completed
+and CPU/PPU phase conversion are owned by the [NES machine](NES_SYSTEM.md).
+External fetches report the completed
 read on the second dot of each two-dot transaction, with a 1-based dot timestamp.
 CPU-port transactions use the completed-dot timestamp and do not advance time.
 
