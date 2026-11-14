@@ -70,6 +70,8 @@ Contract and reference plan: [6502 CPU](CPU_6502.md).
 
 ## 4. PPU and video
 
+Contract, reference cases, and golden frames: [2C02 PPU](PPU_2C02.md).
+
 - [ ] Implement CPU-visible registers, VRAM/OAM access, scrolling, background and
   sprite output, palette selection, and supported mirroring behavior.
 - [ ] Test sprite priority, sprite-zero hit, sprite overflow behavior, vblank,

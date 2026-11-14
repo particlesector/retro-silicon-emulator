@@ -15,8 +15,11 @@ compatibility, workbench, diagnostics, and FPGA verification goals. The
 - `rse_cpu6502`: reusable NMOS 6502 instruction engine with explicit CPU variants,
   independent of NES memory maps, audio, DMA, and frontend APIs. See
   [6502 CPU contract](CPU_6502.md).
+- `rse_ppu2c02`: reusable NTSC PPU register, rendering, palette, and OAM model;
+  external memory is supplied by the machine. See [2C02 contract](PPU_2C02.md).
 - `rse_nes` (`systems/nes`): cartridge loading, NES memory mapping, and a Ricoh CPU
-  variant adapter; PPU, APU, and device integration follow in later milestones. See
+  variant adapter and PPU memory wiring; CPU/PPU timing, APU, and DMA integration
+  follow in later milestones. See
   [NES memory and cartridge loading](NES_MEMORY.md).
 - `rse-cli`: headless execution, tracing, snapshots and differential testing (planned).
 - `rse-desktop`: optional SDL3 window/input/audio and Vulkan renderer.
