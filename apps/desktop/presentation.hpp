@@ -8,20 +8,21 @@
 
 namespace rse::desktop {
 struct Rgb {std::uint8_t r{},g{},b{},a{255};bool operator==(const Rgb&) const=default;};
-// Project-owned approximate display palette. Integer hue/luma construction;
-// not a measured 2C02/composite decoder. Emphasis attenuates other primaries.
+// Conventional 64-color NTSC display approximation, not a composite decoder.
+// Keep palette-code mapping explicit: hue spacing is not linear in RGB.
+// Emphasis remains an approximation which attenuates other primaries.
 inline Rgb rgb(std::uint16_t sample) noexcept {
-    constexpr std::array<std::array<int,3>,12> hues{{
-        {{-64,-32,96}},{{0,-64,96}},{{64,-64,64}},{{96,-64,0}},
-        {{96,-32,-64}},{{64,0,-96}},{{0,32,-96}},{{-64,64,-64}},
-        {{-96,64,0}},{{-96,32,64}},{{-64,0,96}},{{-32,-32,96}}}};
-    constexpr int luma[]{72,128,184,224};
-    const unsigned color=sample&63,level=color>>4,hue=color&15;
-    int r=0,g=0,b=0;
-    if (hue==0) r=g=b=luma[level]+24;
-    else if (hue<=12) {r=luma[level]+hues[hue-1][0];g=luma[level]+hues[hue-1][1];b=luma[level]+hues[hue-1][2];}
-    else if (hue==13 && level>=2) r=g=b=luma[level]-80;
-    r=std::clamp(r,0,255);g=std::clamp(g,0,255);b=std::clamp(b,0,255);
+    constexpr std::array<std::uint32_t,64> palette{
+        0x7c7c7c,0x0000fc,0x0000bc,0x4428bc,0x940084,0xa80020,0xa81000,0x881400,
+        0x503000,0x007800,0x006800,0x005800,0x004058,0x000000,0x000000,0x000000,
+        0xbcbcbc,0x0078f8,0x0058f8,0x6844fc,0xd800cc,0xe40058,0xf83800,0xe45c10,
+        0xac7c00,0x00b800,0x00a800,0x00a844,0x008888,0x000000,0x000000,0x000000,
+        0xf8f8f8,0x3cbcfc,0x6888fc,0x9878f8,0xf878f8,0xf85898,0xf87858,0xfca044,
+        0xf8b800,0xb8f818,0x58d854,0x58f898,0x00e8d8,0x787878,0x000000,0x000000,
+        0xfcfcfc,0xa4e4fc,0xb8b8f8,0xd8b8f8,0xf8b8f8,0xf8a4c0,0xf0d0b0,0xfce0a8,
+        0xf8d878,0xd8f878,0xb8f8b8,0xb8f8d8,0x00fcfc,0xb8b8b8,0x000000,0x000000};
+    const auto color=palette[sample&63];
+    int r=(color>>16)&255,g=(color>>8)&255,b=color&255;
     if (sample&64) {g=g*3/4;b=b*3/4;}
     if (sample&128) {r=r*3/4;b=b*3/4;}
     if (sample&256) {r=r*3/4;g=g*3/4;}

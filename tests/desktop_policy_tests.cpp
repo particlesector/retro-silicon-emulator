@@ -19,6 +19,13 @@ void policy() {
         const auto v=viewport(w,h);check(v.x>=0 && v.y>=0 && v.x+v.w<=w && v.y+v.h<=h && v.w*3-v.h*4<4,"viewport bounds/ratio");
     }
     check(rgb(0x0f)==Rgb{0,0,0,255},"black color");
+    check(rgb(0x20)==Rgb{248,248,248,255},"bright neutral palette entry");
+    check(rgb(0x22)==Rgb{104,136,252,255},"blue sky palette entry");
+    check(rgb(0x16)==Rgb{248,56,0,255},"red palette entry");
+    check(rgb(0x1a)==Rgb{0,168,0,255},"green palette entry");
+    for(unsigned level=0;level<4;++level) {
+        const auto gray=rgb(level*16+13);check(gray.r==gray.g && gray.g==gray.b,"neutral gray palette column");
+    }
     const auto normal=rgb(0x21),red=rgb(0x61);check(red.r==normal.r && red.g==normal.g*3/4 && red.b==normal.b*3/4,"emphasis conversion");
     for(unsigned i=0;i<512;++i) check(rgb(i).a==255,"opaque RGB output");
     Input input;input.key(1,true);input.gamepad(2);check(input.buttons()==3,"input OR");

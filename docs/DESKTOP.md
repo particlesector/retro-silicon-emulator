@@ -60,22 +60,52 @@ Gamepad removal releases its bits. There is no controller-2 or remapping UI.
 ## Presentation and pacing
 
 Frame color/emphasis samples are converted to an opaque RGBA texture using the
-project-owned integer palette in `apps/desktop/presentation.hpp`. Letterboxing
+explicit 64-color NTSC display approximation in `apps/desktop/presentation.hpp`.
+This replaces the original synthetic hue/luma wheel; it is still not a measured
+composite decoder. Emphasis approximately attenuates the other RGB channels.
+Letterboxing
 preserves a 4:3 display ratio at any pixel size; nearest-neighbor sampling is
 used. Only new visible frames or expose/resize events trigger presentation.
-SDL handles Vulkan swapchain recreation; the app requires its `vulkan` backend.
+SDL handles Vulkan swapchain recreation; the app requires its `vulkan` backend
+and synchronized presentation (VSync) to avoid tearing.
 
-The audio source is M6's fixed 48 kHz PCM. The frontend requests whole frames
-while fewer than 5,760 source samples are queued (roughly 120-137 ms of lookahead).
-Each completed video frame carries the cumulative source-sample position at
-its publication. Visible video advances against submitted minus queued source
-samples, rather than immediately displaying the newest simulated frame.
-SDL/device conversion adds a device-buffer latency; this is source-timeline
-synchronization, not a measured speaker/display latency guarantee. Vsync does
-not set chip clocks. Slow hosts can cause reported audio starvation; they do
+The audio source is M6's fixed 48 kHz PCM. A frontend producer thread advances
+the machine in 21,480-master-tick chunks (about 1 ms), sampling current input
+before each chunk. It targets one negotiated audio-device period plus 2 ms of
+source PCM: 12 ms on the tested Windows WASAPI device. This is not a universal
+device latency setting. A slow host can still underrun.
+
+The producer owns all emulation work. A mutex serializes inspection, input,
+load/reset and pause commands; the core is never accessed concurrently. No
+GPU or event APIs run on the producer. Only this thread requests best-effort
+high priority on Windows; the process and system priorities are unchanged.
+It keeps one latest completed video frame, replacing stale frames while the
+GUI is busy. Rendering remains on the main thread with VSync. Audio generation
+therefore continues across refresh, resize and readback waits. Pause/load/reset
+stop the producer before pausing/clearing the stream; resume waits for priming.
+The producer joins before its stream is destroyed, and execution faults are
+reported on the GUI thread without discarding a working cartridge on load error.
+
+The short source queue bounds the newest frame's lead over consumed source PCM;
+SDL/device buffering and display scanout add their own delays. This is not a
+measured speaker/display latency guarantee. Vsync does
+not set chip clocks. For example, Super Mario Bros.' displayed time units are
+shorter than seconds; do not slow the machine to make that counter match a clock.
+Slow hosts can cause reported audio starvation; they do
 not skip emulated cycles. Work per iteration is capped to keep events responsive.
-Input changes are sampled at the next requested frame boundary and scheduled
-at the next master tick. Already queued audio/video is not retroactively changed.
+Input changes are scheduled at the next master tick of the next producer chunk.
+Already executed ticks and queued PCM are not retroactively changed.
+The smoke report's `input_frame_latency_us` is the first injected keyboard
+response. `input_min_us`, `input_max_us` and `input_mean_us` cover four keyboard/
+gamepad press/release color responses observed by the GUI after presentation.
+They exclude physical keyboard, compositor and display scanout latency; they
+are not end-to-end measurements. All four responses are required. The script
+also blocks the GUI for 150 ms and checks continued audio production.
+
+`desktop-playback-tests` (available with the SDL desktop build) verifies paused
+state/RAM/PCM-clock equivalence with the headless machine, pause/reset, fault
+recovery and teardown. Its real-time blocked-GUI/zero-starvation check runs only
+in optimized builds; unoptimized builds retain the deterministic lifecycle checks.
 
 ## Release package
 

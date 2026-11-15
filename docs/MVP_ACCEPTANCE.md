@@ -38,7 +38,8 @@ is a diagnostic projection, not a complete save state or public trace ABI.
 
 Use the [README](../README.md) for Windows/Linux configure/build/test commands
 and [desktop guide](DESKTOP.md#release-package) for Release packaging. A frontend-
-free build still runs all 17 CTest suites. Required earlier reference groups are
+free build still runs 17 CTest suites; a desktop build adds the producer lifecycle
+and audio-continuity suite (18 total). Required earlier reference groups are
 core lifecycle, cartridge/memory, both CPU vector suites and CPU behavior,
 PPU registers/rendering/memory, devices/arbitration, NES system, PCM, desktop
 policy/replay, and CLI. A visual demo never substitutes for a failing suite.
@@ -75,6 +76,8 @@ accumulates master ticks across resets; compare it to `elapsed_ms` for throughpu
 It includes prebuffer/lookahead work and excludes discarded buffers only from
 playback, so it is not exact audible time. `max_frame_work_us` measures the largest
 frame-generation/queue work interval, not a GPU or speaker-latency benchmark.
+The producer-thread candidate instead reports `max_chunk_work_us` for its roughly
+1 ms advancement blocks and `target_audio_bytes` for negotiated source buffering.
 No emulated cycles are skipped to satisfy host pacing.
 Also verify audible continuity and compare simulated progress with wall time.
 A stalled host sink can stop consuming queued PCM without an unsatisfied SDL
@@ -159,3 +162,44 @@ readbacks. Peak audio/video queues were 13,116 bytes/12 frames; maximum frame,
 whole-step, loop-gap, event-pump and sleep times were respectively 6,779, 38,602,
 40,720, 3,271 and 3,368 us. The OS accepted high thread priority. Logs are
 `build/m8/windows-priority-600s.*.log`. The Linux endurance gate remains open.
+
+Subsequent Super Mario Bros. playtesting reported wrong colors and tearing.
+The frontend candidate replaces the synthetic hue wheel with an explicit
+64-color display palette and enables VSync. All 17 Windows Release suites pass.
+Its 30-second Vulkan/WASAPI smoke check produced 1,812 frames in 30,012 ms,
+30,146 simulated ms, zero starvation and five successful readbacks
+(`build/m8-fixes/windows-vsync-30s.*.log`). This candidate has not repeated the
+ten-minute endurance check or received visual gameplay confirmation. A local
+ROM-only diagnostic observed 24-frame timer decrements during active Mario
+play; chip clocks and frozen observations were not changed. No game assets
+were added to the repository.
+
+The user confirmed the corrected colors and absence of tearing, then reported
+input lag. Instrumentation measured 141,297 us from the smoke key injection to
+selection of its changed-color frame. Reducing the steady audio target from
+120 ms to 50 ms, while retaining the larger startup/resize buffer, reduced the
+observed interval to 79,251 us. VSync remains enabled. All 17 Release suites pass;
+the 30,000 ms Windows smoke run reported zero starvation, five readbacks and
+29,946 simulated ms (`build/m8-latency/low-latency-30s.*.log`). This measures
+frontend frame selection, not physical input-to-display latency. Gameplay
+confirmation and a new ten-minute Windows run remain pending for this candidate.
+
+The 50 ms candidate was superseded by an independent frontend producer with
+roughly 1 ms advancement chunks, a negotiated one-device-period + 2 ms PCM
+target, and one latest completed frame. Core clocks and frozen captures remain
+unchanged; VSync and the corrected palette are retained. All 18 Windows Debug
+and Release suites pass, including the producer lifecycle/replay tests.
+The 30-second run measured four input responses at 27,721-28,976 us (mean
+28,243 us) with zero starvation. The extracted Release package then passed
+600,001 ms: 36,050 frames, 599,857 simulated ms, 28,793,142 samples, zero
+starvation, two loads, one reset, three expected errors and five readbacks.
+Its source target was 1,152 bytes (12 ms), peak source queue 1,246 bytes,
+and peak pending video one frame. Maximum chunk work was 1,782 us; even a
+978,823 us event-pump stall did not starve audio. The scripted 150 ms GUI-block
+check also passed. Four responses in this run measured 30,434-32,295 us (mean
+31,401 us). These small samples are software observations, not a guaranteed
+25 ms physical button-to-screen result. The user confirmed the Windows gameplay
+feel, corrected colors and tear-free presentation. Linux endurance remains on
+hold pending native Linux testing. Logs are
+`build/m8-responsive/windows-responsive-600s.*.log`. The tested executable's
+SHA-256 is `86c3b882af2517a5a244f2b91b9b44807f4dde7932f78ee37e3ea1270ee05b07`.

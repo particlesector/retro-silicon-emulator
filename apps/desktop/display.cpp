@@ -9,8 +9,8 @@ Display::Display(SDL_Window* window) {
     renderer_.reset(SDL_CreateRenderer(window,"vulkan"));
     if (!renderer_) throw std::runtime_error(std::string("Vulkan renderer unavailable: ")+SDL_GetError()+". Install a Vulkan-capable graphics driver.");
     if (std::string_view(backend())!="vulkan") throw std::runtime_error("Vulkan renderer was not selected");
-    // Audio consumption paces the machine; presentation must not block on vsync.
-    (void)SDL_SetRenderVSync(renderer_.get(),0);
+    // The audio producer runs independently of this refresh wait.
+    require_sdl(SDL_SetRenderVSync(renderer_.get(),1));
     texture_.reset(SDL_CreateTexture(renderer_.get(),SDL_PIXELFORMAT_RGBA32,SDL_TEXTUREACCESS_STREAMING,256,240));
     require_sdl(bool(texture_));require_sdl(SDL_SetTextureScaleMode(texture_.get(),SDL_SCALEMODE_NEAREST));
 }
