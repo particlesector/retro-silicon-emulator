@@ -70,15 +70,19 @@ jobs:
           SDL_AUDIO_DRIVER: dummy
           SDL_VIDEO_DRIVER: x11
         run: |
-          build/desktop/rse-desktop-policy-tests --write-smoke build/desktop/desktop-smoke.nes
+          cmake -DGENERATOR="$PWD/build/desktop/rse-acceptance-tests" -DOUTPUT="$PWD/build/desktop/acceptance-set" -P cmake/VerifyAcceptance.cmake
           app=$(find "$PWD/build/package-smoke" -name rse-desktop -type f)
           test -n "$app"
           VK_DRIVER_FILES=$(find /usr/share/vulkan/icd.d -name 'lvp_icd*.json' -print -quit)
           test -f "$VK_DRIVER_FILES"
           export VK_DRIVER_FILES
           echo "Vulkan ICD: $VK_DRIVER_FILES"
-          xvfb-run -a sh -c 'openbox >/tmp/rse-openbox.log 2>&1 & vulkaninfo --summary && exec timeout -k 5s 60s "$1" --smoke "$2" --seconds 30' sh "$app" "$PWD/build/desktop/desktop-smoke.nes"
+          xvfb-run -a sh -c 'openbox >/tmp/rse-openbox.log 2>&1 & vulkaninfo --summary && exec timeout -k 5s 60s "$1" --smoke "$2" --seconds 30' sh "$app" "$PWD/build/desktop/acceptance-set/rse-av-input-v1.nes"
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-linux-release
           path: build/desktop/retro-silicon-emulator-*.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-set-v1
+          path: build/desktop/acceptance-set/

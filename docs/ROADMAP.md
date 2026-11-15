@@ -122,6 +122,8 @@ Contract, controls, packages, and verification: [Desktop MVP](DESKTOP.md).
 
 ## 8. MVP acceptance
 
+Frozen programs, procedures, and evidence: [MVP acceptance](MVP_ACCEPTANCE.md).
+
 - [ ] Freeze a small acceptance set of legally available NROM programs before
   desktop acceptance testing. Record versions/hashes, license/source, inputs,
   duration, and expected results. Cover video, audio, input, and reset.

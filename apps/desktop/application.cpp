@@ -98,10 +98,13 @@ public:
                 // Audio consumption requests complete frames; host time never
                 // changes their ticks. Keep 120-137 ms of source audio queued.
                 for (unsigned budget=0;queued()<11520 && budget<8;++budget) {
+                    const auto work_start=SDL_GetTicksNS();const auto before=machine->state().tick;
                     machine->schedule_input(machine->state().tick+1,input.buttons());
                     const auto& frame=machine->run_frame();auto block=machine->take_audio();
                     require_sdl(SDL_PutAudioStreamData(audio.get(),block.data(),int(block.size()*2)));
                     submitted+=block.size();timeline.push(frame,submitted);++generated;
+                    total_ticks+=machine->state().tick-before;total_samples+=block.size();
+                    max_frame_work_us=std::max(max_frame_work_us,(SDL_GetTicksNS()-work_start)/1000);
                 }
                 peak_queue=std::max(peak_queue,queued());peak_frames=std::max(peak_frames,unsigned(timeline.queued()));
                 start_audio=!running_audio;
@@ -133,11 +136,13 @@ public:
         static const SDL_DialogFileFilter filters[]{{"NES cartridge","nes"},{"All files","*"}};
         SDL_ShowOpenFileDialog(selected,new std::shared_ptr<DialogResult>(dialog),window.get(),filters,2,nullptr,false);
     }
-    void report() const {
+    void report(std::uint64_t elapsed_ms) const {
         std::cout<<"Desktop: renderer="<<display->backend()<<" audio="<<SDL_GetCurrentAudioDriver()
                  <<" frames="<<generated<<" loads="<<loads<<" resets="<<resets<<" errors="<<errors
                  <<" readbacks="<<display->readbacks()<<" peak_audio_bytes="<<peak_queue
-                 <<" peak_video_frames="<<peak_frames<<" starvation_requests="<<starvation.load()<<'\n';
+                 <<" peak_video_frames="<<peak_frames<<" starvation_requests="<<starvation.load()
+                 <<" elapsed_ms="<<elapsed_ms<<" simulated_ms="<<total_ticks*11/236250
+                 <<" samples="<<total_samples<<" max_frame_work_us="<<max_frame_work_us<<'\n';
     }
     std::unique_ptr<SDL_Window,decltype(&SDL_DestroyWindow)> window{nullptr,SDL_DestroyWindow};
     std::unique_ptr<Display> display;
@@ -154,6 +159,7 @@ private:
     std::shared_ptr<DialogResult> dialog=std::make_shared<DialogResult>();
     std::unique_ptr<SDL_AudioStream,decltype(&SDL_DestroyAudioStream)> audio{nullptr,SDL_DestroyAudioStream};
     std::uint64_t submitted{},generated{};
+    std::uint64_t total_ticks{},total_samples{},max_frame_work_us{};
     unsigned peak_queue{},peak_frames{};bool minimized{},running_audio{},modal{},redraw{true};
 };
 class Smoke {
@@ -228,8 +234,9 @@ int run_desktop(const std::filesystem::path& cartridge,unsigned seconds,bool smo
             app.pump();if (script) script->tick(app,SDL_GetTicks()-start);app.step();SDL_Delay(2);
         }
         if (script) std::cerr<<"Smoke stopping audio\n";
-        app.stop_audio();app.report();
+        app.stop_audio();const auto elapsed=SDL_GetTicks()-start;app.report(elapsed);
         if (script) {
+            if(elapsed<std::uint64_t(seconds)*1000) throw std::runtime_error("smoke exited before its requested duration");
             std::cerr<<"Smoke closing window\n";script->finish(app);
             app.pad.reset();script.reset();std::cerr<<"Smoke device teardown complete\n";
         }

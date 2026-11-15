@@ -1,0 +1,55 @@
+{
+  "schema": "rse.acceptance.v1",
+  "set_version": 1,
+  "license": "Apache-2.0",
+  "source": "tests/acceptance_programs.hpp and tests/nes_programs.hpp",
+  "frozen_from": "M7 merged commit 55eefb8 (project-owned generated fixtures)",
+  "format": "iNES, mapper 0, 16 KiB PRG, CHR RAM, horizontal mirroring",
+  "headless_run": {
+    "frames": 12,
+    "input": "Set controller 1 to A=1 before frames 5-8; all buttons released before other frames. Schedule each change at current master tick + 1.",
+    "reset": "Repeat the complete timeline after deterministic power-on reset; observations must match.",
+    "chunk_replay": "Replay the same frame-boundary input schedule with advance_to chunks of 997 master ticks."
+  },
+  "desktop_run": {
+    "program": "rse-av-input-v1.nes",
+    "duration_seconds": 600,
+    "input": "Existing --smoke script: keyboard A, focus loss/gain, virtual gamepad A/release, F5 reset, wide/tall resize, missing file, reload, minimize/restore, unsupported and malformed files, then close at requested duration.",
+    "expected": "Two loads, one reset, three expected file errors, at least three Vulkan readbacks, zero audio starvation, no early exit or crash."
+  },
+  "programs": [
+    {
+      "filename": "rse-loop-v1.nes",
+      "sha256": "fa40ee2ef29c43fd342914d25e0e12db4f45596a731894109d1f03f9972e0d1c",
+      "bytes": 16400,
+      "coverage": "CPU loop, fixed blank video, silent PCM, scheduler and reset baseline",
+      "expected": {"tick": 4261144, "samples": 9523, "state": "ed9040d64cb18b54", "events": "7e5d9b9ddad39bd7", "frames": "f83104773c052829", "pcm": "d16759ef6b96e105"}
+    },
+    {
+      "filename": "rse-audio-dma-v1.nes",
+      "sha256": "d7d3446a2b611a9372e9953f926ca1802b633261b0e54fcf2c65cd56147fe41d",
+      "bytes": 16400,
+      "coverage": "Five-channel synthesis, looping DMC, OAM DMA and deterministic PCM",
+      "expected": {"tick": 4261144, "samples": 9523, "state": "28f7f81e71767fb4", "events": "418e4c763e6e040c", "frames": "f83104773c052829", "pcm": "a4d96b23b4cf5dbb"}
+    },
+    {
+      "filename": "rse-av-input-v1.nes",
+      "sha256": "5dca096c5c119c8df7fd7c93b5c361e9d84bf01f88d512bfc310097e08bbc5d8",
+      "bytes": 16400,
+      "coverage": "Combined video/audio, NMI controller reads, visible A-button palette response and reset",
+      "expected": {"tick": 4261120, "samples": 9523, "state": "50c358ce8d7c45ea", "events": "e25fdc508fb80fbb", "frames": "81db4b05c9783829", "pcm": "a4d96b23b4cf5dbb"}
+    },
+    {
+      "filename": "rse-av-input-v1.nes.unsupported.nes",
+      "sha256": "ac7e20b9ca05efcc55e3074ab3107bd7e1f168bebc4544cc5ef96a8bc3803af3",
+      "bytes": 16400,
+      "coverage": "Mapper-1 rejection; must preserve previous cartridge"
+    },
+    {
+      "filename": "rse-av-input-v1.nes.invalid.nes",
+      "sha256": "2f05d4b689d270cafb02285f35f44866f7dc8a2d368a3f9d1124373eeab31fb1",
+      "bytes": 3,
+      "coverage": "Truncated-header rejection; must preserve previous cartridge"
+    }
+  ]
+}

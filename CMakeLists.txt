@@ -29,6 +29,13 @@ add_executable(rse-cli apps/cli/main.cpp)
 target_link_libraries(rse-cli PRIVATE rse_cli_commands)
 if(RSE_BUILD_TESTS)
   enable_testing()
+  add_executable(rse-acceptance-tests tests/acceptance_tests.cpp)
+  target_link_libraries(rse-acceptance-tests PRIVATE rse_nes)
+  add_test(NAME acceptance-replay-tests COMMAND rse-acceptance-tests)
+  add_test(NAME acceptance-fixture-hashes COMMAND ${CMAKE_COMMAND}
+    "-DGENERATOR=$<TARGET_FILE:rse-acceptance-tests>"
+    "-DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/acceptance-set"
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/VerifyAcceptance.cmake")
   add_executable(rse-apu-tests tests/apu_tests.cpp)
   target_link_libraries(rse-apu-tests PRIVATE rse_apu2a03 rse_devices)
   add_test(NAME apu-tests COMMAND rse-apu-tests)

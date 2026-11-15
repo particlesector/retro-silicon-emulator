@@ -68,4 +68,5 @@ See [Architecture](docs/ARCHITECTURE.md) for the project structure and
 See [Desktop usage and packages](docs/DESKTOP.md) for controls, cartridge loading,
 and Release packaging. [Audio-only playback](docs/APU_2A03.md#desktop-playback)
 is also available.
+See [MVP verification](docs/MVP_ACCEPTANCE.md) for the frozen test set and support limits.
 Licensed under [Apache-2.0](LICENSE).
