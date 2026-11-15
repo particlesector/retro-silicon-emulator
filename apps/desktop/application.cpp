@@ -219,7 +219,8 @@ private:
 int run_desktop(const std::filesystem::path& cartridge,unsigned seconds,bool smoke) {
     using namespace rse::desktop;
     try {
-        Application app(smoke);if (!cartridge.empty()) app.load(cartridge);
+        Application app(smoke);if (smoke) app.step();
+        if (!cartridge.empty()) app.load(cartridge);
         if (smoke && !app.machine) throw std::runtime_error("smoke fixture could not be loaded");
         std::unique_ptr<Smoke> script;if (smoke) script=std::make_unique<Smoke>(cartridge);
         const auto start=SDL_GetTicks();

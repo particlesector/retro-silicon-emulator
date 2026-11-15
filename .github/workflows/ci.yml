@@ -77,7 +77,7 @@ jobs:
           test -f "$VK_DRIVER_FILES"
           export VK_DRIVER_FILES
           echo "Vulkan ICD: $VK_DRIVER_FILES"
-          xvfb-run -a sh -c 'openbox >/tmp/rse-openbox.log 2>&1 & vulkaninfo --summary && exec timeout 60s "$1" --smoke "$2" --seconds 30' sh "$app" "$PWD/build/desktop/desktop-smoke.nes"
+          xvfb-run -a sh -c 'openbox >/tmp/rse-openbox.log 2>&1 & vulkaninfo --summary && exec timeout -k 5s 60s "$1" --smoke "$2" --seconds 30' sh "$app" "$PWD/build/desktop/desktop-smoke.nes"
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-linux-release

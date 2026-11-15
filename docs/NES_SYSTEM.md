@@ -117,7 +117,8 @@ Success prints one JSON record with format `rse.run.v1`, elapsed master `ticks`,
 Exit codes: 0 success, 2 arguments, 3 unsupported/malformed cartridge, 4 execution
 failure, 5 cartridge I/O failure, 6 other loading failure. Errors go to stderr.
 Unsupported CPU opcodes fail explicitly. Audio capture/playback is described in
-[2A03 APU](APU_2A03.md); desktop video integration remains M7 work.
+[2A03 APU](APU_2A03.md); combined video/input playback is documented in
+[Desktop MVP](DESKTOP.md).
 
 ## Validation
 

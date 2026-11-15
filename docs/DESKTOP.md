@@ -123,3 +123,28 @@ resizes to wide and tall windows. Vulkan readback compares actual texture colors
 and black letterbox corners. Expected load errors are printed. Failure of any
 assertion or any unsatisfied SDL audio request makes the test fail. The test
 does not establish physical gamepad compatibility or subjective audio quality.
+
+## Validation
+
+All 15 CTest suites pass in Windows/MSVC and Linux/GCC Debug and Release;
+Linux ASan/UBSan with leak detection also passes. Chip reference fixtures remain
+unchanged. The desktop replay verifies 120 frames of identical CPU/frame/PCM
+observations across different advancement chunks.
+
+On November 14, 2026, an extracted Windows Release ZIP ran for 30 seconds on
+Windows 11 build 26200, AMD Ryzen AI Max+ 395 / Radeon 8060S, SDL 3.4.14 and WASAPI.
+It generated 1,801 frames, made two successful loads and one reset, recovered
+from three expected file errors, passed five Vulkan readback checks, and reported
+zero starvation. Startup buffering was then increased to 120-137 ms to cover
+software Vulkan initialization; subsequent Windows smoke checks also pass.
+The native Windows picker, visible emulated frame, reset/exit, and readable
+welcome screen were inspected interactively.
+
+The extracted Linux Release ZIP passed the same 30-second flow in
+[CI run 43672447350](https://github.com/particlesector/retro-silicon-emulator/actions/runs/43672447350):
+Ubuntu 24.04.5, SDL 3.4.14, Xvfb/Openbox, Mesa 25.2.8 lavapipe (llvmpipe), dummy
+audio and a virtual standard gamepad. It generated 1,823 frames, passed five
+Vulkan readback checks, and reported zero starvation with a peak source queue
+of 13,116 bytes. Linux native GPU, physical audio/gamepad, Wayland, and native
+file-portal behavior are not established by this virtual-display check.
+M8 retains the frozen compatibility set and ten-minute physical-host sessions.
