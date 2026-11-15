@@ -109,5 +109,13 @@ combined fixture; virtual display/audio remains distinct from physical playback.
 The selected Linux endurance environment is Ubuntu 24.04 through WSLg on the
 same Windows host, with its real display/PulseAudio bridge. The session is pending
 recovery of a WSLg manager blocked before creating the display/audio sockets;
-no dummy-audio result will be substituted. Windows endurance evidence is added
-after its full 600-second session completes.
+no dummy-audio result will be substituted.
+
+The first Windows session ran for 600,001 ms without a crash but failed the
+strict zero-starvation check: 36,056 frames, 18 unsatisfied SDL requests,
+599,941 simulated ms and a maximum frame work interval of 13,451 us. It overlapped
+local builds and WSLg diagnostics. That result is retained as a failure; an
+instrumented retry without those concurrent workloads is in progress. Timing
+diagnostics now include maximum whole-step/loop gaps and first/last starvation
+ticks so host stalls can be distinguished from emulation work. Logs are under
+`build/m8/windows-600s.*.log` and `windows-quiet-600s.*.log` on the test host.

@@ -50,7 +50,7 @@ jobs:
         run: >-
           sudo apt-get update && sudo apt-get install -y ninja-build g++
           libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev
-          libxss-dev libxtst-dev libasound2-dev libvulkan-dev mesa-vulkan-drivers
+          libxss-dev libxtst-dev libasound2-dev libpulse-dev libvulkan-dev mesa-vulkan-drivers
           xvfb xauth openbox vulkan-tools
       - name: Build SDL3
         run: |
