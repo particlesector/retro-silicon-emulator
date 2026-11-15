@@ -114,8 +114,13 @@ no dummy-audio result will be substituted.
 The first Windows session ran for 600,001 ms without a crash but failed the
 strict zero-starvation check: 36,056 frames, 18 unsatisfied SDL requests,
 599,941 simulated ms and a maximum frame work interval of 13,451 us. It overlapped
-local builds and WSLg diagnostics. That result is retained as a failure; an
-instrumented retry without those concurrent workloads is in progress. Timing
-diagnostics now include maximum whole-step/loop gaps and first/last starvation
-ticks so host stalls can be distinguished from emulation work. Logs are under
+local builds and WSLg diagnostics. An instrumented quiet retry also failed:
+18 requests between SDL ticks 383,841 and 384,011, a maximum loop gap of 291,496 us,
+maximum whole-step work of 40,025 us and maximum frame work of 10,122 us. Both
+results are retained as failures. Timing diagnostics include maximum whole-step,
+event-pump, sleep and loop gaps plus first/last starvation ticks. Logs are under
 `build/m8/windows-600s.*.log` and `windows-quiet-600s.*.log` on the test host.
+The next candidate requests high priority for the Windows audio-producing thread
+only, with a nonfatal fallback if the OS rejects it. This is not a real-time or
+system-wide policy. Its five-second package check passed; the ten-minute rerun
+is pending and the endurance gate remains open.

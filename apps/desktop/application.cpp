@@ -33,6 +33,12 @@ public:
         SDL_AudioSpec spec{SDL_AUDIO_S16,1,48000};
         audio.reset(SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,&spec,observe,this));
         if (!audio) throw std::runtime_error(std::string("Audio device unavailable: ")+SDL_GetError());
+#ifdef SDL_PLATFORM_WINDOWS
+        // This thread produces queued audio as well as handling presentation.
+        // Give it bounded high-priority service on Windows; no real-time class
+        // or process-wide/system setting is changed. Failure remains nonfatal.
+        producer_priority_raised=SDL_SetCurrentThreadPriority(SDL_THREAD_PRIORITY_HIGH);
+#endif
         int count{};auto* ids=SDL_GetGamepads(&count);
         for (int i=0;i<count && !pad;++i) connect(ids[i]);SDL_free(ids);
     }
@@ -70,6 +76,7 @@ public:
         }
     }
     void pump() {
+        const auto pump_start=SDL_GetTicksNS();
         SDL_Event e;while (SDL_PollEvent(&e)) event(e);
         std::optional<std::string> path,problem;
         {std::lock_guard lock(dialog->mutex);if (dialog->ready) {
@@ -90,6 +97,11 @@ public:
             for (unsigned i=0;i<8;++i) if (SDL_GetGamepadButton(pad.get(),map[i])) buttons|=1<<i;
         }
         input.gamepad(buttons);
+        max_pump_work_us=std::max(max_pump_work_us,(SDL_GetTicksNS()-pump_start)/1000);
+    }
+    void idle() {
+        const auto start=SDL_GetTicksNS();SDL_Delay(2);
+        max_sleep_us=std::max(max_sleep_us,(SDL_GetTicksNS()-start)/1000);
     }
     void step() {
         const auto step_start=SDL_GetTicksNS();
@@ -148,8 +160,10 @@ public:
                  <<" elapsed_ms="<<elapsed_ms<<" simulated_ms="<<total_ticks*11/236250
                  <<" samples="<<total_samples<<" max_frame_work_us="<<max_frame_work_us
                  <<" max_step_work_us="<<max_step_work_us<<" max_loop_gap_us="<<max_loop_gap_us
+                 <<" max_pump_work_us="<<max_pump_work_us<<" max_sleep_us="<<max_sleep_us
                  <<" starvation_bytes="<<starvation_bytes.load()<<" first_starvation_tick="<<first_starvation.load()
-                 <<" last_starvation_tick="<<last_starvation.load()<<'\n';
+                 <<" last_starvation_tick="<<last_starvation.load()
+                 <<" producer_priority="<<(producer_priority_raised?"high":"normal")<<'\n';
     }
     std::unique_ptr<SDL_Window,decltype(&SDL_DestroyWindow)> window{nullptr,SDL_DestroyWindow};
     std::unique_ptr<Display> display;
@@ -176,7 +190,8 @@ private:
     std::uint64_t submitted{},generated{};
     std::uint64_t total_ticks{},total_samples{},max_frame_work_us{};
     std::uint64_t last_step{},max_step_work_us{},max_loop_gap_us{};
-    unsigned peak_queue{},peak_frames{};bool minimized{},running_audio{},modal{},redraw{true};
+    std::uint64_t max_pump_work_us{},max_sleep_us{};
+    unsigned peak_queue{},peak_frames{};bool minimized{},running_audio{},modal{},redraw{true},producer_priority_raised{};
 };
 class Smoke {
 public:
@@ -248,7 +263,7 @@ int run_desktop(const std::filesystem::path& cartridge,unsigned seconds,bool smo
         const auto start=SDL_GetTicks();
         while (app.running && (!seconds || SDL_GetTicks()-start<std::uint64_t(seconds)*1000)) {
             app.pump();if(!app.running)break;
-            if (script) script->tick(app,SDL_GetTicks()-start);app.step();SDL_Delay(2);
+            if (script) script->tick(app,SDL_GetTicks()-start);app.step();app.idle();
         }
         if (script) std::cerr<<"Smoke stopping audio\n";
         app.stop_audio();const auto elapsed=SDL_GetTicks()-start;app.report(elapsed);
