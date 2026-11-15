@@ -76,6 +76,9 @@ It includes prebuffer/lookahead work and excludes discarded buffers only from
 playback, so it is not exact audible time. `max_frame_work_us` measures the largest
 frame-generation/queue work interval, not a GPU or speaker-latency benchmark.
 No emulated cycles are skipped to satisfy host pacing.
+Also verify audible continuity and compare simulated progress with wall time.
+A stalled host sink can stop consuming queued PCM without an unsatisfied SDL
+request; a zero starvation counter alone is insufficient to pass acceptance.
 
 Run on Windows and Linux with an actual display/audio path for the physical-host
 gate. Xvfb/lavapipe/dummy-audio CI verifies the integration but cannot establish
@@ -106,10 +109,35 @@ Release, and Linux CI Debug/Release plus ASan/UBSan with leak detection
 The CI desktop job also verifies the extracted Release package using the frozen
 combined fixture; virtual display/audio remains distinct from physical playback.
 
-The selected Linux endurance environment is Ubuntu 24.04 through WSLg on the
-same Windows host, with its real display/PulseAudio bridge. The session is pending
-recovery of a WSLg manager blocked before creating the display/audio sockets;
-no dummy-audio result will be substituted.
+The selected Linux endurance environment is Ubuntu 24.04.4 through WSLg 1.0.66
+(WSL 2.6.1, kernel 6.6.87.2-microsoft-standard-WSL2) on the same Windows host.
+It uses SDL 3.4.14, X11, PulseAudio and Mesa 25.2.8 software Vulkan (llvmpipe,
+LLVM 20.1.2), not a native Linux GPU driver. Restarting WSL restored initially
+missing display/audio sockets. The first five-second check failed with one
+starvation request and 161,781 us maximum step work; the 30-second retry passed.
+The first long session failed audible playback: the user heard silence with
+occasional glitches, WSLg logged RDP sink queue overruns, and monitor captures
+returned no samples. A separate `paplay` reference tone was also inaudible.
+The stopped session reported 489,936 elapsed ms but only 77,169 simulated ms,
+despite zero SDL starvation requests. This is retained as a failure, not a pass.
+Restarting WSLg's PulseAudio service restored the reference tone, confirmed by
+the user. The fresh emulator run initially sounded continuous, then glitched
+again. It was stopped at 102,979 elapsed ms with 46,020 simulated ms and zero
+starvation requests; WSLg again logged queue overruns. A recovered monitor
+capture contained varying PCM, confirming delivery into the bridge before
+the failure. A subsequent independent 120-second `paplay` tone sounded
+continuous to the user, but the player failed to finish draining within its
+150-second timeout (exit 124). These observations do not isolate the exact root
+cause or establish successful Linux endurance. WSLg's reported
+[pause/resume issue](https://github.com/microsoft/wslg/issues/1392) is a possible
+lead, not a confirmed diagnosis. A standalone SDL tone probe, with the same
+pause/clear/resume pattern but no emulation or Vulkan, also glitched and advanced
+only 40,916 ms of generated PCM in 90,004 ms. This reproduces the failure outside
+the emulator core; it does not identify which SDL/WSLg component is responsible.
+At the user's request, Linux endurance is on hold until testing on native Linux.
+No WSLg result is accepted as a substitute, and the Linux gate remains open.
+Logs are under
+`build/m8/wslg-600s.*.log` and `wslg-recovered-600s.*.log` on the test host.
 
 The first Windows session ran for 600,001 ms without a crash but failed the
 strict zero-starvation check: 36,056 frames, 18 unsatisfied SDL requests,
