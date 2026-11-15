@@ -120,7 +120,14 @@ maximum whole-step work of 40,025 us and maximum frame work of 10,122 us. Both
 results are retained as failures. Timing diagnostics include maximum whole-step,
 event-pump, sleep and loop gaps plus first/last starvation ticks. Logs are under
 `build/m8/windows-600s.*.log` and `windows-quiet-600s.*.log` on the test host.
-The next candidate requests high priority for the Windows audio-producing thread
+The verified candidate requests high priority for the Windows audio-producing thread
 only, with a nonfatal fallback if the OS rejects it. This is not a real-time or
-system-wide policy. Its five-second package check passed; the ten-minute rerun
-is pending and the endurance gate remains open.
+system-wide policy. The extracted Release package at `6335078` passed its
+600,001 ms run with Vulkan/WASAPI on Windows 11 Pro build 26200, an AMD Ryzen AI
+Max+ 395 and Radeon 8060S (driver 32.0.31032.1003), using SDL 3.4.14 and MSVC 19.44.
+It produced 36,068 frames and 28,806,774 samples (600,141 simulated ms), with zero
+starvation requests, two loads, one reset, three expected errors and five GPU
+readbacks. Peak audio/video queues were 13,116 bytes/12 frames; maximum frame,
+whole-step, loop-gap, event-pump and sleep times were respectively 6,779, 38,602,
+40,720, 3,271 and 3,368 us. The OS accepted high thread priority. Logs are
+`build/m8/windows-priority-600s.*.log`. The Linux endurance gate remains open.
