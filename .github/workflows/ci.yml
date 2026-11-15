@@ -78,6 +78,13 @@ jobs:
           export VK_DRIVER_FILES
           echo "Vulkan ICD: $VK_DRIVER_FILES"
           xvfb-run -a sh -c 'openbox >/tmp/rse-openbox.log 2>&1 & vulkaninfo --summary && exec timeout -k 5s 60s "$1" --smoke "$2" --seconds 30' sh "$app" "$PWD/build/desktop/acceptance-set/rse-av-input-v1.nes"
+          xvfb-run -a sh -c '
+            openbox >/tmp/rse-openbox-early.log 2>&1 &
+            timeout --preserve-status -s INT -k 5s 6s "$1" --smoke "$2" --seconds 30 >"$3" 2>&1
+            result=$?
+            cat "$3"
+            test "$result" -eq 1 && grep -q "smoke exited before its requested duration" "$3"
+          ' sh "$app" "$PWD/build/desktop/acceptance-set/rse-av-input-v1.nes" "$PWD/build/desktop/early-exit.log"
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-linux-release
