@@ -168,6 +168,7 @@ public:
     ~Smoke() {joystick.reset();if (id) SDL_DetachVirtualJoystick(id);}
     void tick(Application& app,std::uint64_t elapsed) {
         if (elapsed<500+stage*150) return;
+        if (stage<=16) std::cerr<<"Smoke step "<<stage<<'\n';
         auto push=[&](SDL_Event e){require_sdl(SDL_PushEvent(&e));};
         auto key=[&](SDL_Scancode code,bool down) {SDL_Event e{};e.type=down?SDL_EVENT_KEY_DOWN:SDL_EVENT_KEY_UP;e.key.scancode=code;push(e);};
         auto focus=[&](bool gained) {SDL_Event e{};e.type=gained?SDL_EVENT_WINDOW_FOCUS_GAINED:SDL_EVENT_WINDOW_FOCUS_LOST;push(e);};
@@ -225,6 +226,12 @@ int run_desktop(const std::filesystem::path& cartridge,unsigned seconds,bool smo
         while (app.running && (!seconds || SDL_GetTicks()-start<std::uint64_t(seconds)*1000)) {
             app.pump();if (script) script->tick(app,SDL_GetTicks()-start);app.step();SDL_Delay(2);
         }
-        app.stop_audio();app.report();if (script) script->finish(app);return 0;
+        if (script) std::cerr<<"Smoke stopping audio\n";
+        app.stop_audio();app.report();
+        if (script) {
+            std::cerr<<"Smoke closing window\n";script->finish(app);
+            app.pad.reset();script.reset();std::cerr<<"Smoke device teardown complete\n";
+        }
+        return 0;
     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
 }

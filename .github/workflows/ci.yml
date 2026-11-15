@@ -38,6 +38,7 @@ jobs:
         run: ctest --test-dir build/sanitizers --output-on-failure
   desktop-linux:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
@@ -76,7 +77,7 @@ jobs:
           test -f "$VK_DRIVER_FILES"
           export VK_DRIVER_FILES
           echo "Vulkan ICD: $VK_DRIVER_FILES"
-          xvfb-run -a sh -c 'openbox >/tmp/rse-openbox.log 2>&1 & vulkaninfo --summary && exec "$1" --smoke "$2" --seconds 30' sh "$app" "$PWD/build/desktop/desktop-smoke.nes"
+          xvfb-run -a sh -c 'openbox >/tmp/rse-openbox.log 2>&1 & vulkaninfo --summary && exec timeout 60s "$1" --smoke "$2" --seconds 30' sh "$app" "$PWD/build/desktop/desktop-smoke.nes"
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-linux-release
