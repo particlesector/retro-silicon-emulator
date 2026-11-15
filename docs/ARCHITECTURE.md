@@ -27,7 +27,9 @@ compatibility, workbench, diagnostics, and FPGA verification goals. The
   and OAM/DMC DMA, APU IRQ routing, and bounded audio capture. See
   [NES memory](NES_MEMORY.md) and [system timing and execution](NES_SYSTEM.md).
 - `rse-cli`: headless execution, tracing, snapshots and differential testing (planned).
-- `rse-desktop`: optional SDL3 window/input/audio and Vulkan renderer.
+- `rse-desktop`: optional SDL3 window/input/audio and Vulkan renderer. A frontend
+  producer advances a single serialized machine independently of GUI/VSync waits;
+  events and GPU work stay on the main thread. See [pacing](DESKTOP.md#presentation-and-pacing).
 
 ## Architectural invariants
 - No SDL3 or Vulkan dependencies in `rse_core`.
@@ -73,7 +75,8 @@ runtime owns master-clock scheduling and has verified headless execution of the
 generated NROM fixtures in [M5](NES_SYSTEM.md). This does not establish broad ROM
 compatibility. [APU/audio](APU_2A03.md) includes deterministic PCM and SDL playback.
 The [desktop](DESKTOP.md) presents through SDL3's Vulkan renderer, loads supported
-cartridges, maps input, and paces video against PCM consumption. Verification is
+cartridges, maps input, and uses PCM consumption to pace a short-lookahead
+producer while presenting its newest completed frame. Verification is
 limited to its documented fixtures, hosts, and renderer readback cases.
 
 ## Next milestone

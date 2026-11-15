@@ -122,17 +122,21 @@ Contract, controls, packages, and verification: [Desktop MVP](DESKTOP.md).
 
 ## 8. MVP acceptance
 
-- [ ] Freeze a small acceptance set of legally available NROM programs before
+Frozen programs, procedures, and evidence: [MVP acceptance](MVP_ACCEPTANCE.md).
+
+- [x] Freeze a small acceptance set of legally available NROM programs before
   desktop acceptance testing. Record versions/hashes, license/source, inputs,
   duration, and expected results. Cover video, audio, input, and reset.
-- [ ] All earlier milestone checklists and the named automated reference suite
+- [x] All earlier milestone checklists and the named automated reference suite
   pass; test failures cannot be waived by a successful visual demo.
-- [ ] Record successful Release smoke tests on Windows and Linux, including a
+- [x] Record successful Release smoke tests on Windows and Linux, including a
   continuous 10-minute session on each platform with no crash or sustained
   audio underruns. Record host hardware and pacing performance.
-- [ ] Publish reproducible build/run/test instructions, supported cartridge
+  Native Ubuntu 24.04 LTS testing was manually approved by the project owner;
+  unavailable hardware/counter details are explicitly noted in the acceptance record.
+- [x] Publish reproducible build/run/test instructions, supported cartridge
   constraints, test results, and remaining limitations.
-- [ ] Keep deferred features outside the MVP release; make no NES accuracy,
+- [x] Keep deferred features outside the MVP release; make no NES accuracy,
   Vulkan rendering, or FPGA equivalence claims beyond recorded verification.
 
 ## After the MVP

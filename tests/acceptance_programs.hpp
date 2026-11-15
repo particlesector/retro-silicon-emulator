@@ -1,0 +1,40 @@
+// SPDX-License-Identifier: Apache-2.0
+#pragma once
+#include "nes_programs.hpp"
+#include <array>
+#include <string_view>
+
+// Frozen acceptance v1. These are project-owned NROM programs, not game ROMs.
+// Byte changes require a new version/manifest, never updated expected hashes.
+namespace rse::acceptance {
+inline NesProgram av_input_program() {
+    auto p=audio_program();
+    p.patches.clear();
+    p.at(p.labels.at("audio-idle"));
+    p.emit({0xa9,0x3f,0x8d,6,0x20,0xa9,0,0x8d,6,0x20,0xa9,0x0f,0x8d,7,0x20,
+            0xa9,0x21,0x8d,7,0x20,0xa9,0,0x8d,6,0x20,0x8d,6,0x20,0xa2,8,0xa9,0xff});
+    p.label("pattern");p.emit({0x8d,7,0x20,0xca});p.branch(0xd0,"pattern");
+    p.emit({0xa9,0,0x8d,6,0x20,0x8d,6,0x20,0x8d,5,0x20,0x8d,5,0x20,
+            0xa9,0x80,0x8d,0,0x20,0xa9,0x0a,0x8d,1,0x20});
+    p.label("video-idle");p.jump(0x4c,"video-idle");
+    p.at(0x9000);p.emit({0x48,0x8a,0x48,0xe6,0,0xa9,1,0x8d,0x16,0x40,
+                        0xa9,0,0x8d,0x16,0x40,0xa2,8});
+    p.label("buttons");p.emit({0xad,0x16,0x40,0x29,1,0x4a,0x66,0x10,0xca});p.branch(0xd0,"buttons");
+    p.emit({0xa9,0x3f,0x8d,6,0x20,0xa9,1,0x8d,6,0x20,0xa5,0x10,0x29,1,0x49,0x21,
+            0x8d,7,0x20,0xa9,0,0x8d,5,0x20,0x8d,5,0x20,0x68,0xaa,0x68,0x40});
+    return p;
+}
+inline auto programs() {
+    NesProgram loop;loop.emit({0xe6,0x10,0x4c,0,0x80});
+    return std::array<std::pair<std::string_view,NesProgram>,3>{{
+        {"rse-loop-v1.nes",std::move(loop)},
+        {"rse-audio-dma-v1.nes",audio_program()},
+        {"rse-av-input-v1.nes",av_input_program()}}};
+}
+inline std::vector<std::uint8_t> image(NesProgram program) {
+    (void)program.cartridge();
+    std::vector<std::uint8_t> bytes(16+program.prg.size());
+    bytes[0]='N';bytes[1]='E';bytes[2]='S';bytes[3]=0x1a;bytes[4]=1;
+    std::copy(program.prg.begin(),program.prg.end(),bytes.begin()+16);return bytes;
+}
+} // namespace rse::acceptance

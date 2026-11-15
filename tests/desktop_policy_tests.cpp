@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "presentation.hpp"
 #include "application.hpp"
-#include "nes_programs.hpp"
+#include "acceptance_programs.hpp"
 #include <rse/systems/nes/machine.hpp>
 #include <fstream>
 #include <iostream>
@@ -9,24 +9,6 @@
 namespace {
 using namespace rse::desktop;
 void check(bool ok,const char* message){if (!ok) throw std::runtime_error(message);}
-NesProgram fixture() {
-    auto p=audio_program();
-    p.patches.clear(); // The old audio-loop jump is overwritten below.
-    // Replace the audio loop with video initialization, keeping all five voices.
-    p.at(p.labels.at("audio-idle"));
-    p.emit({0xa9,0x3f,0x8d,6,0x20,0xa9,0,0x8d,6,0x20,0xa9,0x0f,0x8d,7,0x20,
-            0xa9,0x21,0x8d,7,0x20,0xa9,0,0x8d,6,0x20,0x8d,6,0x20,0xa2,8,0xa9,0xff});
-    p.label("pattern");p.emit({0x8d,7,0x20,0xca});p.branch(0xd0,"pattern");
-    p.emit({0xa9,0,0x8d,6,0x20,0x8d,6,0x20,0x8d,5,0x20,0x8d,5,0x20,
-            0xa9,0x80,0x8d,0,0x20,0xa9,0x0a,0x8d,1,0x20});
-    p.label("video-idle");p.jump(0x4c,"video-idle");
-    p.at(0x9000);p.emit({0x48,0x8a,0x48,0xe6,0,0xa9,1,0x8d,0x16,0x40,
-                        0xa9,0,0x8d,0x16,0x40,0xa2,8});
-    p.label("buttons");p.emit({0xad,0x16,0x40,0x29,1,0x4a,0x66,0x10,0xca});p.branch(0xd0,"buttons");
-    p.emit({0xa9,0x3f,0x8d,6,0x20,0xa9,1,0x8d,6,0x20,0xa5,0x10,0x29,1,0x49,0x21,
-            0x8d,7,0x20,0xa9,0,0x8d,5,0x20,0x8d,5,0x20,0x68,0xaa,0x68,0x40});
-    return p;
-}
 void policy() {
     check(utf8_path("caf\xc3\xa9.nes").u8string()==u8"caf\u00e9.nes","UTF-8 cartridge path");
     check(viewport(960,720)==Viewport{0,0,960,720},"4:3 viewport");
@@ -37,6 +19,13 @@ void policy() {
         const auto v=viewport(w,h);check(v.x>=0 && v.y>=0 && v.x+v.w<=w && v.y+v.h<=h && v.w*3-v.h*4<4,"viewport bounds/ratio");
     }
     check(rgb(0x0f)==Rgb{0,0,0,255},"black color");
+    check(rgb(0x20)==Rgb{248,248,248,255},"bright neutral palette entry");
+    check(rgb(0x22)==Rgb{104,136,252,255},"blue sky palette entry");
+    check(rgb(0x16)==Rgb{248,56,0,255},"red palette entry");
+    check(rgb(0x1a)==Rgb{0,168,0,255},"green palette entry");
+    for(unsigned level=0;level<4;++level) {
+        const auto gray=rgb(level*16+13);check(gray.r==gray.g && gray.g==gray.b,"neutral gray palette column");
+    }
     const auto normal=rgb(0x21),red=rgb(0x61);check(red.r==normal.r && red.g==normal.g*3/4 && red.b==normal.b*3/4,"emphasis conversion");
     for(unsigned i=0;i<512;++i) check(rgb(i).a==255,"opaque RGB output");
     Input input;input.key(1,true);input.gamepad(2);check(input.buttons()==3,"input OR");
@@ -49,7 +38,7 @@ void policy() {
     video.reset();check(video.visible().number==0 && video.queued()==0,"reset drops old video");
 }
 void replay() {
-    auto p=fixture();const auto rom=p.cartridge();
+    auto p=rse::acceptance::av_input_program();const auto rom=p.cartridge();
     rse::nes::Machine a(rom,rse::nes::Profile{.capture_audio=true}),b(rom,rse::nes::Profile{.capture_audio=true});
     std::vector<std::int16_t> expected,actual;
     for(unsigned i=0;i<120;++i) {
@@ -64,7 +53,7 @@ void replay() {
     check(actual==expected && actual.size()>90000,"desktop PCM replay mismatch");
 }
 void write(const char* path) {
-    auto p=fixture();(void)p.cartridge();std::array<std::uint8_t,16> header{'N','E','S',0x1a,1};
+    auto p=rse::acceptance::av_input_program();(void)p.cartridge();std::array<std::uint8_t,16> header{'N','E','S',0x1a,1};
     std::ofstream out(path,std::ios::binary);out.write(reinterpret_cast<const char*>(header.data()),header.size());
     out.write(reinterpret_cast<const char*>(p.prg.data()),p.prg.size());out.close();check(bool(out),"fixture write failed");
     header[6]=0x10;

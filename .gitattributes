@@ -1,1 +1,2 @@
 tests/data/*/vectors.txt text eol=lf linguist-generated=true
+*.sh text eol=lf
