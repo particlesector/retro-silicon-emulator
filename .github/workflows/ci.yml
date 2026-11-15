@@ -69,6 +69,7 @@ jobs:
         env:
           SDL_AUDIO_DRIVER: dummy
           SDL_VIDEO_DRIVER: x11
+          SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS: "1"
         run: |
           cmake -DGENERATOR="$PWD/build/desktop/rse-acceptance-tests" -DOUTPUT="$PWD/build/desktop/acceptance-set" -P cmake/VerifyAcceptance.cmake
           app=$(find "$PWD/build/package-smoke" -name rse-desktop -type f)

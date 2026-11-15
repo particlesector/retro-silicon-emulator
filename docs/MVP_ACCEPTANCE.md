@@ -99,7 +99,15 @@ adds acceptance evidence rather than expanding that scope.
 
 ## Results
 
-The set and expected observations were frozen before M8 desktop testing.
-Automated Debug/Release results and physical-host endurance evidence are recorded
-below as they are completed. The Linux physical-host environment is awaiting
-selection; a virtual CI run must not be substituted silently.
+The set and expected observations were committed as `5005e45` before M8 desktop
+testing. All 17 suites pass in Windows/MSVC Debug and Release, local Ubuntu/GCC
+Release, and Linux CI Debug/Release plus ASan/UBSan with leak detection
+([CI run 43678639983](https://github.com/particlesector/retro-silicon-emulator/actions/runs/43678639983)).
+The CI desktop job also verifies the extracted Release package using the frozen
+combined fixture; virtual display/audio remains distinct from physical playback.
+
+The selected Linux endurance environment is Ubuntu 24.04 through WSLg on the
+same Windows host, with its real display/PulseAudio bridge. The session is pending
+recovery of a WSLg manager blocked before creating the display/audio sockets;
+no dummy-audio result will be substituted. Windows endurance evidence is added
+after its full 600-second session completes.

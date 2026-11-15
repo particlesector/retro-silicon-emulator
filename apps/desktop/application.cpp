@@ -92,6 +92,9 @@ public:
         input.gamepad(buttons);
     }
     void step() {
+        const auto step_start=SDL_GetTicksNS();
+        if(last_step) max_loop_gap_us=std::max(max_loop_gap_us,(step_start-last_step)/1000);
+        last_step=step_start;
         bool start_audio=false;
         if (machine && !minimized && !modal) {
             try {
@@ -118,6 +121,7 @@ public:
         // Finish initial Vulkan setup while prebuffered audio is still paused.
         if (start_audio) {require_sdl(SDL_ResumeAudioStreamDevice(audio.get()));running_audio=true;}
         verify_next=false;
+        max_step_work_us=std::max(max_step_work_us,(SDL_GetTicksNS()-step_start)/1000);
     }
     [[nodiscard]] unsigned queued() const {const int n=SDL_GetAudioStreamQueued(audio.get());require_sdl(n>=0);return unsigned(n);}
     void stop_audio() {require_sdl(SDL_PauseAudioStreamDevice(audio.get()));require_sdl(SDL_ClearAudioStream(audio.get()));}
@@ -142,7 +146,10 @@ public:
                  <<" readbacks="<<display->readbacks()<<" peak_audio_bytes="<<peak_queue
                  <<" peak_video_frames="<<peak_frames<<" starvation_requests="<<starvation.load()
                  <<" elapsed_ms="<<elapsed_ms<<" simulated_ms="<<total_ticks*11/236250
-                 <<" samples="<<total_samples<<" max_frame_work_us="<<max_frame_work_us<<'\n';
+                 <<" samples="<<total_samples<<" max_frame_work_us="<<max_frame_work_us
+                 <<" max_step_work_us="<<max_step_work_us<<" max_loop_gap_us="<<max_loop_gap_us
+                 <<" starvation_bytes="<<starvation_bytes.load()<<" first_starvation_tick="<<first_starvation.load()
+                 <<" last_starvation_tick="<<last_starvation.load()<<'\n';
     }
     std::unique_ptr<SDL_Window,decltype(&SDL_DestroyWindow)> window{nullptr,SDL_DestroyWindow};
     std::unique_ptr<Display> display;
@@ -154,12 +161,21 @@ public:
     std::atomic<unsigned> starvation{};
 private:
     static void SDLCALL observe(void* userdata,SDL_AudioStream*,int additional,int) {
-        if (additional>0) static_cast<Application*>(userdata)->starvation.fetch_add(1,std::memory_order_relaxed);
+        if (additional>0) {
+            auto& app=*static_cast<Application*>(userdata);
+            app.starvation.fetch_add(1,std::memory_order_relaxed);
+            app.starvation_bytes.fetch_add(unsigned(additional),std::memory_order_relaxed);
+            const auto now=SDL_GetTicks();std::uint64_t empty=0;
+            (void)app.first_starvation.compare_exchange_strong(empty,now,std::memory_order_relaxed);
+            app.last_starvation.store(now,std::memory_order_relaxed);
+        }
     }
+    std::atomic<std::uint64_t> starvation_bytes{},first_starvation{},last_starvation{};
     std::shared_ptr<DialogResult> dialog=std::make_shared<DialogResult>();
     std::unique_ptr<SDL_AudioStream,decltype(&SDL_DestroyAudioStream)> audio{nullptr,SDL_DestroyAudioStream};
     std::uint64_t submitted{},generated{};
     std::uint64_t total_ticks{},total_samples{},max_frame_work_us{};
+    std::uint64_t last_step{},max_step_work_us{},max_loop_gap_us{};
     unsigned peak_queue{},peak_frames{};bool minimized{},running_audio{},modal{},redraw{true};
 };
 class Smoke {
@@ -231,7 +247,8 @@ int run_desktop(const std::filesystem::path& cartridge,unsigned seconds,bool smo
         std::unique_ptr<Smoke> script;if (smoke) script=std::make_unique<Smoke>(cartridge);
         const auto start=SDL_GetTicks();
         while (app.running && (!seconds || SDL_GetTicks()-start<std::uint64_t(seconds)*1000)) {
-            app.pump();if (script) script->tick(app,SDL_GetTicks()-start);app.step();SDL_Delay(2);
+            app.pump();if(!app.running)break;
+            if (script) script->tick(app,SDL_GetTicks()-start);app.step();SDL_Delay(2);
         }
         if (script) std::cerr<<"Smoke stopping audio\n";
         app.stop_audio();const auto elapsed=SDL_GetTicks()-start;app.report(elapsed);
