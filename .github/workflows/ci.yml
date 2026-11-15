@@ -78,9 +78,8 @@ jobs:
           test -f "$VK_DRIVER_FILES"
           export VK_DRIVER_FILES
           echo "Vulkan ICD: $VK_DRIVER_FILES"
-          xvfb-run -a sh -c 'openbox >/tmp/rse-openbox.log 2>&1 & vulkaninfo --summary && exec timeout -k 5s 60s "$1" --smoke "$2" --seconds 30' sh "$app" "$PWD/build/desktop/acceptance-set/rse-av-input-v1.nes"
-          xvfb-run -a sh -c '
-            openbox >/tmp/rse-openbox-early.log 2>&1 &
+          xvfb-run -a sh cmake/RunWithWindowManager.sh sh -c 'vulkaninfo --summary && exec timeout -k 5s 60s "$1" --smoke "$2" --seconds 30' sh "$app" "$PWD/build/desktop/acceptance-set/rse-av-input-v1.nes"
+          xvfb-run -a sh cmake/RunWithWindowManager.sh sh -c '
             timeout --preserve-status -s INT -k 5s 6s "$1" --smoke "$2" --seconds 30 >"$3" 2>&1
             result=$?
             cat "$3"
