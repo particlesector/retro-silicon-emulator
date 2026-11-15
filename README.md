@@ -10,7 +10,7 @@ desktop frontend.
   workload and a Windows SDK.
 - On Linux: GCC or Clang with C++23 support and Ninja. Install your distribution's
   C++ development tools, CMake, and Ninja packages.
-- For the optional desktop frontend: SDL3 development files and the Vulkan SDK.
+- For the optional desktop frontend: SDL3 3.2 or newer development files and the Vulkan SDK.
 
 ## Build and test
 
@@ -35,7 +35,8 @@ Show CLI help and version information:
 
 To include the desktop frontend, add `-DRSE_BUILD_DESKTOP=ON` to the configure
 command. SDL3 and Vulkan must be discoverable by CMake; set `SDL3_DIR` to the
-directory containing `SDL3Config.cmake` if needed. The desktop executable is
+directory containing `SDL3Config.cmake` if needed, and set `RSE_SDL_LICENSE` to
+SDL3's `LICENSE.txt` for runtime packaging. The desktop executable is
 `build/vs/Debug/rse-desktop.exe`.
 
 ### Linux
@@ -57,11 +58,14 @@ Run the CLI:
 
 For the optional desktop frontend, install SDL3 and Vulkan development packages
 and configure with `cmake --preset dev -DRSE_BUILD_DESKTOP=ON`. Build with the
-same preset commands above, then run `./build/dev/rse-desktop`.
+same preset commands above, supplying `-DRSE_SDL_LICENSE=/path/to/SDL/LICENSE.txt`,
+then run `./build/dev/rse-desktop`.
 
 The Ninja preset also works on Windows from a Visual Studio Developer PowerShell.
 
 See [Architecture](docs/ARCHITECTURE.md) for the project structure and
 [Headless execution](docs/NES_SYSTEM.md#headless-runner) for CLI usage.
-See [Audio playback](docs/APU_2A03.md#desktop-playback) for desktop audio commands.
+See [Desktop usage and packages](docs/DESKTOP.md) for controls, cartridge loading,
+and Release packaging. [Audio-only playback](docs/APU_2A03.md#desktop-playback)
+is also available.
 Licensed under [Apache-2.0](LICENSE).

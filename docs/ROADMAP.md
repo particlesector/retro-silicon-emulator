@@ -107,15 +107,17 @@ Contract, reference cases, and playback checks: [2A03 APU](APU_2A03.md).
 
 ## 7. Desktop MVP
 
-- [ ] Select a cartridge, start execution, reset, and exit normally; invalid or
+Contract, controls, packages, and verification: [Desktop MVP](DESKTOP.md).
+
+- [x] Select a cartridge, start execution, reset, and exit normally; invalid or
   unsupported cartridges produce an actionable error.
-- [ ] Present the emulated frame through Vulkan with a preserved aspect ratio;
+- [x] Present the emulated frame through Vulkan with a preserved aspect ratio;
   window resizing and closing work on Windows and Linux.
-- [ ] Map a documented keyboard layout and one standard gamepad to NES input;
+- [x] Map a documented keyboard layout and one standard gamepad to NES input;
   losing window focus clears held keyboard buttons.
-- [ ] Provide real-time pacing and synchronized video/audio without changing
+- [x] Provide real-time pacing and synchronized video/audio without changing
   deterministic core results.
-- [ ] Build Release packages with required runtime dependencies and verify
+- [x] Build Release packages with required runtime dependencies and verify
   launch, video, audio, input, reset, and exit on both supported platforms.
 
 ## 8. MVP acceptance

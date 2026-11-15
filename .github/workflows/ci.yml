@@ -36,3 +36,49 @@ jobs:
           ASAN_OPTIONS: detect_leaks=1
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
         run: ctest --test-dir build/sanitizers --output-on-failure
+  desktop-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: libsdl-org/SDL
+          ref: 147a8ee32dbf9ac02f3794964490687b6bbda1bc # SDL 3.4.14
+          path: build/sdl-source
+      - name: Install desktop tools
+        run: >-
+          sudo apt-get update && sudo apt-get install -y ninja-build g++
+          libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev
+          libxss-dev libxtst-dev libasound2-dev libvulkan-dev mesa-vulkan-drivers
+          xvfb xauth openbox vulkan-tools
+      - name: Build SDL3
+        run: |
+          cmake -S build/sdl-source -B build/sdl-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$PWD/build/sdl-install" -DSDL_TESTS=OFF -DSDL_STATIC=OFF -DSDL_X11=ON -DSDL_VULKAN=ON
+          cmake --build build/sdl-build --parallel 2
+          cmake --install build/sdl-build
+      - name: Build and package Release desktop
+        run: |
+          cmake -S . -B build/desktop -G Ninja -DCMAKE_BUILD_TYPE=Release -DRSE_BUILD_DESKTOP=ON -DCMAKE_PREFIX_PATH="$PWD/build/sdl-install" -DRSE_SDL_LICENSE="$PWD/build/sdl-source/LICENSE.txt"
+          cmake --build build/desktop --parallel 2
+          ctest --test-dir build/desktop --output-on-failure
+          cmake --build build/desktop --target package
+          mkdir build/package-smoke
+          unzip build/desktop/retro-silicon-emulator-*.zip -d build/package-smoke
+      - name: Verify extracted Vulkan desktop package
+        env:
+          SDL_AUDIO_DRIVER: dummy
+          SDL_VIDEO_DRIVER: x11
+        run: |
+          build/desktop/rse-desktop-policy-tests --write-smoke build/desktop/desktop-smoke.nes
+          app=$(find "$PWD/build/package-smoke" -name rse-desktop -type f)
+          test -n "$app"
+          VK_DRIVER_FILES=$(find /usr/share/vulkan/icd.d -name 'lvp_icd*.json' -print -quit)
+          test -f "$VK_DRIVER_FILES"
+          export VK_DRIVER_FILES
+          echo "Vulkan ICD: $VK_DRIVER_FILES"
+          xvfb-run -a sh -c 'openbox >/tmp/rse-openbox.log 2>&1 & vulkaninfo --summary && exec timeout -k 5s 60s "$1" --smoke "$2" --seconds 30' sh "$app" "$PWD/build/desktop/desktop-smoke.nes"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-linux-release
+          path: build/desktop/retro-silicon-emulator-*.zip

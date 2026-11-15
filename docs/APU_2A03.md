@@ -124,7 +124,8 @@ unsatisfied SDL requests and a peak source queue of 12,844 bytes. It generated
 `c9be5a38b715e684` after the divider-phase correction. Earlier 30-second runs
 also reported zero starvation.
 These are stream diagnostics; audible output was not independently assessed.
-Linux hardware playback and M7's combined frontend smoke checks are still pending.
+See [Desktop verification](DESKTOP.md#validation) for combined frontend smoke
+checks. Physical Linux audio/gamepad acceptance remains an M8 gate.
 
 Linux Debug/Release and ASan/UBSan with leak detection pass all 14 suites in
 [CI run 43655211909](https://github.com/particlesector/retro-silicon-emulator/actions/runs/43655211909).
