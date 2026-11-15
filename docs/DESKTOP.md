@@ -1,0 +1,125 @@
+# Desktop MVP (M7)
+
+## Contract and reference plan
+
+The desktop owns cartridge selection, RGB conversion, Vulkan presentation, SDL
+input/audio devices, and real-time pacing. It does not modify chip clocks or
+instruction behavior. SDL3's explicitly selected `vulkan` renderer uploads the
+completed 256x240 frame; failure to obtain that backend is an error, not a silent
+fallback. Display output uses a documented approximate RGB palette and 4:3 aspect
+ratio with letterboxing. This is not composite-video or analog color emulation.
+
+Acceptance cases, specified before implementation:
+
+- `desktop-policy`: palette/emphasis conversion, 4:3 viewport bounds, input
+  combination/focus release, and frame selection against consumed PCM positions.
+- `desktop-replay`: the same frame-boundary input sequence and frame count
+  produce identical machine state, frames, and PCM under different host budgets.
+- `desktop-smoke`: a project-owned generated NROM fixture exercises visible
+  output, audio, keyboard, a virtual standard SDL gamepad, focus release, reset,
+  cartridge replacement/error recovery, resize, and normal close. Vulkan readback
+  checks the actual output and letterbox regions; report audio starvation.
+- `release-package`: install and archive the Release app with SDL3 and license
+  notices, then run the extracted package on Windows and Linux. Linux CI may use
+  Xvfb, lavapipe, and dummy audio; record this boundary rather than claiming a
+  physical Linux GPU, controller, or sound device was tested.
+
+The M1-M6 reference suites must continue to pass. No game ROMs or proprietary
+firmware are used by the smoke tests. M8's ten-minute physical-host acceptance
+session and frozen compatibility set remain separate gates.
+
+## Use
+
+Run `rse-desktop` and press **O** (or Ctrl+O) to choose a cartridge. A `.nes` file
+can also be dropped into the window, or supplied on the command line:
+
+```sh
+rse-desktop example.nes
+```
+
+Only the documented mapper-0 iNES subset is accepted. Missing, malformed, or
+unsupported files produce an error; opening another cartridge remains possible.
+Failed cartridge selection preserves the running cartridge. **F5** reconstructs
+its deterministic power-on state and clears queued audio/video and input. **Esc**
+or the window's close button exits. Minimizing pauses emulation and playback;
+restoring resumes. File dialogs and error messages also pause playback.
+
+| NES button | Keyboard | Standard SDL gamepad |
+| --- | --- | --- |
+| A | X | South (A on Xbox) |
+| B | Z | West (X on Xbox) |
+| Select | Right Shift | Back/View |
+| Start | Enter | Start/Menu |
+| Directions | Arrow keys | D-pad |
+
+The first connected standard SDL gamepad supplies controller 1. Keyboard and
+gamepad bits combine with OR; simultaneous opposite directions are preserved.
+Focus loss clears keyboard state and suppresses input until focus returns.
+Gamepad removal releases its bits. There is no controller-2 or remapping UI.
+
+## Presentation and pacing
+
+Frame color/emphasis samples are converted to an opaque RGBA texture using the
+project-owned integer palette in `apps/desktop/presentation.hpp`. Letterboxing
+preserves a 4:3 display ratio at any pixel size; nearest-neighbor sampling is
+used. Only new visible frames or expose/resize events trigger presentation.
+SDL handles Vulkan swapchain recreation; the app requires its `vulkan` backend.
+
+The audio source is M6's fixed 48 kHz PCM. The frontend requests whole frames
+while fewer than 2,400 source samples are queued (roughly 50-67 ms of lookahead).
+Each completed video frame carries the cumulative source-sample position at
+its publication. Visible video advances against submitted minus queued source
+samples, rather than immediately displaying the newest simulated frame.
+SDL/device conversion adds a device-buffer latency; this is source-timeline
+synchronization, not a measured speaker/display latency guarantee. Vsync does
+not set chip clocks. Slow hosts can cause reported audio starvation; they do
+not skip emulated cycles. Work per iteration is capped to keep events responsive.
+Input changes are sampled at the next requested frame boundary and scheduled
+at the next master tick. Already queued audio/video is not retroactively changed.
+
+## Release package
+
+Configure the desktop with the README's requirements. Supply SDL3's license
+path, which is required to redistribute its runtime. For example on Windows:
+
+```powershell
+cmake -S . -B build/vs -G "Visual Studio 17 2022" -A x64 -DRSE_BUILD_DESKTOP=ON -DSDL3_DIR=C:/sdl3/SDL3-3.4.14/cmake -DRSE_SDL_LICENSE=C:/sdl3/SDL3-3.4.14/LICENSE.txt
+cmake --build build/vs --config Release
+ctest --test-dir build/vs -C Release --output-on-failure
+cmake --build build/vs --config Release --target PACKAGE
+```
+
+On Linux:
+
+```sh
+cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release -DRSE_BUILD_DESKTOP=ON -DCMAKE_PREFIX_PATH=/path/to/sdl-install -DRSE_SDL_LICENSE=/path/to/SDL/LICENSE.txt
+cmake --build build/release
+ctest --test-dir build/release --output-on-failure
+cmake --build build/release --target package
+```
+
+The ZIP appears in the build directory. Extract it and run `rse-desktop` from
+the extracted folder. Windows includes SDL3 and the MSVC runtime DLLs; Linux
+includes SDL3 under `lib` with a relative runtime search path. Both include
+project/SDL license notices and documentation. The host supplies the Vulkan
+loader/graphics driver, window system, audio backend, and ordinary OS libraries;
+these packages are not distribution-independent Linux static binaries.
+The Vulkan development SDK is needed for building, not for end-user deployment.
+
+## Reproduce the smoke test
+
+Use a built test executable to generate the valid fixture plus its malformed
+and unsupported companions, then run the packaged executable:
+
+```sh
+rse-desktop-policy-tests --write-smoke desktop-smoke.nes
+rse-desktop --smoke desktop-smoke.nes --seconds 30
+```
+
+The program includes five-channel audio, a visible solid color, and an NMI
+controller reader at RAM $10. The smoke script injects keyboard/focus/drop/close
+events, attaches a virtual standard SDL gamepad, resets, minimizes/restores, and
+resizes to wide and tall windows. Vulkan readback compares actual texture colors
+and black letterbox corners. Expected load errors are printed. Failure of any
+assertion or any unsatisfied SDL audio request makes the test fail. The test
+does not establish physical gamepad compatibility or subjective audio quality.

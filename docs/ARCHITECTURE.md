@@ -72,8 +72,9 @@ The generic runtime provides the [M1 lifecycle contract](CORE_TIMING.md). The NE
 runtime owns master-clock scheduling and has verified headless execution of the
 generated NROM fixtures in [M5](NES_SYSTEM.md). This does not establish broad ROM
 compatibility. [APU/audio](APU_2A03.md) includes deterministic PCM and SDL playback.
-Desktop still creates a window without a Vulkan swapchain or frame presentation;
-combined video/audio pacing and input UI remain M7 work.
+The [desktop](DESKTOP.md) presents through SDL3's Vulkan renderer, loads supported
+cartridges, maps input, and paces video against PCM consumption. Verification is
+limited to its documented fixtures, hosts, and renderer readback cases.
 
 ## Next milestone
 Follow the [MVP roadmap](ROADMAP.md) and its acceptance gates for remaining work.

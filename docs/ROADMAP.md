@@ -107,6 +107,8 @@ Contract, reference cases, and playback checks: [2A03 APU](APU_2A03.md).
 
 ## 7. Desktop MVP
 
+Contract, controls, packages, and verification: [Desktop MVP](DESKTOP.md).
+
 - [ ] Select a cartridge, start execution, reset, and exit normally; invalid or
   unsupported cartridges produce an actionable error.
 - [ ] Present the emulated frame through Vulkan with a preserved aspect ratio;
