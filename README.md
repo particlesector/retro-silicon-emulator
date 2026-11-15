@@ -10,7 +10,7 @@ desktop frontend.
   workload and a Windows SDK.
 - On Linux: GCC or Clang with C++23 support and Ninja. Install your distribution's
   C++ development tools, CMake, and Ninja packages.
-- For the optional desktop frontend: SDL3 development files and the Vulkan SDK.
+- For the optional desktop frontend: SDL3 3.2 or newer development files and the Vulkan SDK.
 
 ## Build and test
 

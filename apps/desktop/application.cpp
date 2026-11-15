@@ -96,7 +96,7 @@ public:
         if (machine && !minimized && !modal) {
             try {
                 // Audio consumption requests complete frames; host time never
-                // changes their ticks. Keep 3-4 frames of source audio queued.
+                // changes their ticks. Keep 120-137 ms of source audio queued.
                 for (unsigned budget=0;queued()<11520 && budget<8;++budget) {
                     machine->schedule_input(machine->state().tick+1,input.buttons());
                     const auto& frame=machine->run_frame();auto block=machine->take_audio();

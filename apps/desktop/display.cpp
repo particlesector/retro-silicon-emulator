@@ -16,6 +16,7 @@ Display::Display(SDL_Window* window) {
 }
 void Display::draw(const video::PpuFrame* frame,bool verify) {
     auto* r=renderer_.get();int width{},height{};
+    require_sdl(SDL_SetRenderLogicalPresentation(r,0,0,SDL_LOGICAL_PRESENTATION_DISABLED));
     require_sdl(SDL_GetRenderOutputSize(r,&width,&height));
     if (width<=0 || height<=0) return;
     require_sdl(SDL_SetRenderDrawColor(r,0,0,0,255));require_sdl(SDL_RenderClear(r));
@@ -48,8 +49,14 @@ void Display::draw(const video::PpuFrame* frame,bool verify) {
             ++readbacks_;
         }
     } else {
+        require_sdl(SDL_SetRenderLogicalPresentation(r,480,360,SDL_LOGICAL_PRESENTATION_LETTERBOX));
+        require_sdl(SDL_SetRenderDrawColor(r,150,190,255,255));
+        require_sdl(SDL_RenderDebugText(r,32,40,"Retro Silicon Emulator"));
         require_sdl(SDL_SetRenderDrawColor(r,210,220,235,255));
-        require_sdl(SDL_RenderDebugText(r,24,32,"Retro Silicon Emulator\n\nO / Ctrl+O  Open cartridge\nDrop a .nes file to start\n\nZ / X       B / A\nArrows      Direction\nEnter       Start\nRight Shift Select\nF5          Reset\nEscape      Exit"));
+        constexpr const char* lines[]{"Open a cartridge to start.","","O / Ctrl+O    Open cartridge",
+            "Or drop a .nes file here.","","X / Z         A / B","Arrow keys    Directions",
+            "Enter         Start","Right Shift   Select","","F5 Reset      Esc Exit"};
+        float y=76;for (auto* line:lines) {require_sdl(SDL_RenderDebugText(r,32,y,line));y+=18;}
     }
     require_sdl(SDL_RenderPresent(r));
 }
