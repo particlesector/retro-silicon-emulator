@@ -129,9 +129,11 @@ Frozen programs, procedures, and evidence: [MVP acceptance](MVP_ACCEPTANCE.md).
   duration, and expected results. Cover video, audio, input, and reset.
 - [x] All earlier milestone checklists and the named automated reference suite
   pass; test failures cannot be waived by a successful visual demo.
-- [ ] Record successful Release smoke tests on Windows and Linux, including a
+- [x] Record successful Release smoke tests on Windows and Linux, including a
   continuous 10-minute session on each platform with no crash or sustained
   audio underruns. Record host hardware and pacing performance.
+  Native Ubuntu 24.04 LTS testing was manually approved by the project owner;
+  unavailable hardware/counter details are explicitly noted in the acceptance record.
 - [x] Publish reproducible build/run/test instructions, supported cartridge
   constraints, test results, and remaining limitations.
 - [x] Keep deferred features outside the MVP release; make no NES accuracy,

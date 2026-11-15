@@ -137,8 +137,8 @@ lead, not a confirmed diagnosis. A standalone SDL tone probe, with the same
 pause/clear/resume pattern but no emulation or Vulkan, also glitched and advanced
 only 40,916 ms of generated PCM in 90,004 ms. This reproduces the failure outside
 the emulator core; it does not identify which SDL/WSLg component is responsible.
-At the user's request, Linux endurance is on hold until testing on native Linux.
-No WSLg result is accepted as a substitute, and the Linux gate remains open.
+These WSLg failures were not accepted as a substitute for native Linux testing.
+The subsequent owner-approved native Ubuntu result is recorded below.
 Logs are under
 `build/m8/wslg-600s.*.log` and `wslg-recovered-600s.*.log` on the test host.
 
@@ -199,7 +199,21 @@ and peak pending video one frame. Maximum chunk work was 1,782 us; even a
 check also passed. Four responses in this run measured 30,434-32,295 us (mean
 31,401 us). These small samples are software observations, not a guaranteed
 25 ms physical button-to-screen result. The user confirmed the Windows gameplay
-feel, corrected colors and tear-free presentation. Linux endurance remains on
-hold pending native Linux testing. Logs are
+feel, corrected colors and tear-free presentation. Logs are
 `build/m8-responsive/windows-responsive-600s.*.log`. The tested executable's
 SHA-256 is `86c3b882af2517a5a244f2b91b9b44807f4dde7932f78ee37e3ea1270ee05b07`.
+
+### Native Linux manual approval
+
+On November 15, 2026, project owner Chris confirmed that the smoke test ran for
+ten continuous minutes without issues on a native Ubuntu 24.04 LTS machine:
+the blue test screen and constant audio played successfully. He also reported
+successful extended Super Mario Bros. gameplay and explicitly approved the
+Linux acceptance result manually. The M8 Linux gate is accepted on this basis.
+
+This is owner-reported manual validation. CPU/GPU/driver details, the exact
+tested build identifier, pacing counters and the smoke log were not supplied;
+Chris was away from the machine and requested approval without collecting
+those details. No measurements are inferred from the gameplay report. The
+failed WSLg sessions above remain separate evidence. Together with the recorded
+Windows endurance run and passing automated checks, this closes M8 acceptance.
