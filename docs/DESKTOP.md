@@ -66,7 +66,7 @@ used. Only new visible frames or expose/resize events trigger presentation.
 SDL handles Vulkan swapchain recreation; the app requires its `vulkan` backend.
 
 The audio source is M6's fixed 48 kHz PCM. The frontend requests whole frames
-while fewer than 2,400 source samples are queued (roughly 50-67 ms of lookahead).
+while fewer than 5,760 source samples are queued (roughly 120-137 ms of lookahead).
 Each completed video frame carries the cumulative source-sample position at
 its publication. Visible video advances against submitted minus queued source
 samples, rather than immediately displaying the newest simulated frame.

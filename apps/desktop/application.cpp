@@ -92,18 +92,19 @@ public:
         input.gamepad(buttons);
     }
     void step() {
+        bool start_audio=false;
         if (machine && !minimized && !modal) {
             try {
                 // Audio consumption requests complete frames; host time never
                 // changes their ticks. Keep 3-4 frames of source audio queued.
-                for (unsigned budget=0;queued()<4800 && budget<4;++budget) {
+                for (unsigned budget=0;queued()<11520 && budget<8;++budget) {
                     machine->schedule_input(machine->state().tick+1,input.buttons());
                     const auto& frame=machine->run_frame();auto block=machine->take_audio();
                     require_sdl(SDL_PutAudioStreamData(audio.get(),block.data(),int(block.size()*2)));
                     submitted+=block.size();timeline.push(frame,submitted);++generated;
                 }
                 peak_queue=std::max(peak_queue,queued());peak_frames=std::max(peak_frames,unsigned(timeline.queued()));
-                if (!running_audio) {require_sdl(SDL_ResumeAudioStreamDevice(audio.get()));running_audio=true;}
+                start_audio=!running_audio;
                 const auto waiting=std::min<std::uint64_t>(submitted,queued()/2);redraw=timeline.advance(submitted-waiting)||redraw;
             } catch(const std::exception& e) {
                 stop_audio();machine.reset();timeline.reset();redraw=true;error(std::string("Execution stopped: ")+e.what()+"\nPress O to choose another cartridge.");
@@ -111,6 +112,8 @@ public:
             }
         }
         if (!minimized && (redraw || verify_next)) {display->draw(machine ? &timeline.visible() : nullptr,smoke && verify_next);redraw=false;}
+        // Finish initial Vulkan setup while prebuffered audio is still paused.
+        if (start_audio) {require_sdl(SDL_ResumeAudioStreamDevice(audio.get()));running_audio=true;}
         verify_next=false;
     }
     [[nodiscard]] unsigned queued() const {const int n=SDL_GetAudioStreamQueued(audio.get());require_sdl(n>=0);return unsigned(n);}
@@ -200,7 +203,9 @@ public:
         }
     }
     void finish(Application& app) {
-        if (stage<16 || app.display->readbacks()<3 || app.starvation.load()) throw std::runtime_error("desktop smoke acceptance failed");
+        if (stage<16 || app.display->readbacks()<3 || app.starvation.load())
+            throw std::runtime_error("desktop smoke acceptance failed: stage="+std::to_string(stage)+
+                " readbacks="+std::to_string(app.display->readbacks())+" starvation="+std::to_string(app.starvation.load()));
         SDL_Event e{};e.type=SDL_EVENT_WINDOW_CLOSE_REQUESTED;require_sdl(SDL_PushEvent(&e));app.pump();
         if (app.running) throw std::runtime_error("window close failed");
     }
@@ -220,7 +225,6 @@ int run_desktop(const std::filesystem::path& cartridge,unsigned seconds,bool smo
         while (app.running && (!seconds || SDL_GetTicks()-start<std::uint64_t(seconds)*1000)) {
             app.pump();if (script) script->tick(app,SDL_GetTicks()-start);app.step();SDL_Delay(2);
         }
-        if (script) script->finish(app);
-        app.stop_audio();app.report();return 0;
+        app.stop_audio();app.report();if (script) script->finish(app);return 0;
     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
 }
