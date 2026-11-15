@@ -50,7 +50,7 @@ jobs:
           sudo apt-get update && sudo apt-get install -y ninja-build g++
           libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxfixes-dev
           libxss-dev libxtst-dev libasound2-dev libvulkan-dev mesa-vulkan-drivers
-          xvfb xauth
+          xvfb xauth openbox vulkan-tools
       - name: Build SDL3
         run: |
           cmake -S build/sdl-source -B build/sdl-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$PWD/build/sdl-install" -DSDL_TESTS=OFF -DSDL_STATIC=OFF -DSDL_X11=ON -DSDL_VULKAN=ON
@@ -68,12 +68,15 @@ jobs:
         env:
           SDL_AUDIO_DRIVER: dummy
           SDL_VIDEO_DRIVER: x11
-          VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
         run: |
           build/desktop/rse-desktop-policy-tests --write-smoke build/desktop/desktop-smoke.nes
           app=$(find "$PWD/build/package-smoke" -name rse-desktop -type f)
           test -n "$app"
-          xvfb-run -a "$app" --smoke "$PWD/build/desktop/desktop-smoke.nes" --seconds 30
+          VK_DRIVER_FILES=$(find /usr/share/vulkan/icd.d -name 'lvp_icd*.json' -print -quit)
+          test -f "$VK_DRIVER_FILES"
+          export VK_DRIVER_FILES
+          echo "Vulkan ICD: $VK_DRIVER_FILES"
+          xvfb-run -a sh -c 'openbox >/tmp/rse-openbox.log 2>&1 & vulkaninfo --summary && exec "$1" --smoke "$2" --seconds 30' sh "$app" "$PWD/build/desktop/desktop-smoke.nes"
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-linux-release

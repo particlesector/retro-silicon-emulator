@@ -57,7 +57,7 @@ public:
         if (e.type==SDL_EVENT_WINDOW_FOCUS_GAINED) {input.focus(true);return;}
         if (e.type==SDL_EVENT_WINDOW_MINIMIZED) {minimized=true;require_sdl(SDL_PauseAudioStreamDevice(audio.get()));return;}
         if (e.type==SDL_EVENT_WINDOW_RESTORED) {minimized=false;redraw=true;if (running_audio && !modal) require_sdl(SDL_ResumeAudioStreamDevice(audio.get()));return;}
-        if (e.type==SDL_EVENT_DROP_FILE && e.drop.data) {load(std::filesystem::u8path(e.drop.data));return;}
+        if (e.type==SDL_EVENT_DROP_FILE && e.drop.data) {load(utf8_path(e.drop.data));return;}
         if (e.type==SDL_EVENT_GAMEPAD_ADDED) {connect(e.gdevice.which);return;}
         if (e.type==SDL_EVENT_GAMEPAD_REMOVED && pad && SDL_GetGamepadID(pad.get())==e.gdevice.which) {pad.reset();input.gamepad(0);return;}
         if (e.type==SDL_EVENT_KEY_DOWN || e.type==SDL_EVENT_KEY_UP) {
@@ -81,7 +81,7 @@ public:
             if (running_audio && !minimized) require_sdl(SDL_ResumeAudioStreamDevice(audio.get()));
         }
         if (problem && !problem->empty()) error("File selection failed: "+*problem+"\nYou can also drop a .nes file into the window.");
-        else if (path && !path->empty()) load(std::filesystem::u8path(*path));
+        else if (path && !path->empty()) load(utf8_path(*path));
         std::uint8_t buttons=0;
         if (pad && SDL_GamepadConnected(pad.get())) {
             constexpr SDL_GamepadButton map[]{SDL_GAMEPAD_BUTTON_SOUTH,SDL_GAMEPAD_BUTTON_WEST,

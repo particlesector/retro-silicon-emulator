@@ -23,7 +23,7 @@ int main(int argc,char** argv) {
                 const auto result=std::from_chars(value.data(),value.data()+value.size(),seconds);
                 if (result.ec!=std::errc{} || result.ptr!=value.data()+value.size() || !seconds || seconds>3600)
                     throw std::invalid_argument("Seconds must be an integer from 1 to 3600");
-            } else if (path.empty() && !arg.starts_with("--")) path=std::filesystem::u8path(arg);
+            } else if (path.empty() && !arg.starts_with("--")) path=utf8_path(arg);
             else throw std::invalid_argument("Invalid arguments. Use --help.");
         }
         if ((audio || smoke) && path.empty()) throw std::invalid_argument("A cartridge path is required");

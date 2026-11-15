@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "presentation.hpp"
+#include "application.hpp"
 #include "nes_programs.hpp"
 #include <rse/systems/nes/machine.hpp>
 #include <fstream>
@@ -27,6 +28,7 @@ NesProgram fixture() {
     return p;
 }
 void policy() {
+    check(utf8_path("caf\xc3\xa9.nes").u8string()==u8"caf\u00e9.nes","UTF-8 cartridge path");
     check(viewport(960,720)==Viewport{0,0,960,720},"4:3 viewport");
     check(viewport(1000,480)==Viewport{180,0,640,480},"wide letterbox");
     check(viewport(480,720)==Viewport{0,180,480,360},"tall letterbox");
