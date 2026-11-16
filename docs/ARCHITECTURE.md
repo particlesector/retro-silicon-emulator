@@ -27,6 +27,10 @@ compatibility, workbench, diagnostics, and FPGA verification goals. The
   and OAM/DMC DMA, APU IRQ routing, and bounded audio capture. See
   [NES memory](NES_MEMORY.md) and [system timing and execution](NES_SYSTEM.md).
 - `rse-cli`: headless execution, tracing, snapshots and differential testing (planned).
+- `rse_session`: internal application contract for metadata, advancement, named
+  input and frame/PCM delivery. `rse_nes_session` adapts the specialized NES
+  runtime; `rse_builtin_sessions` selects built-in machines. These libraries
+  have no SDL3/Vulkan dependency. See [machine sessions](SESSIONS.md).
 - `rse-desktop`: optional SDL3 window/input/audio and Vulkan renderer. A frontend
   producer advances a single serialized machine independently of GUI/VSync waits;
   events and GPU work stay on the main thread. See [pacing](DESKTOP.md#presentation-and-pacing).
