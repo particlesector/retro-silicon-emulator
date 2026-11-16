@@ -110,10 +110,13 @@ and DAC equivalence, PAL, expansion audio, and silicon-specific DMC stop/abort
 bugs are not verified. Frame/register behavior is defined at CPU-slot resolution;
 subcycle write collisions (including length reload at a frame clock and $4011
 DAC conflicts) need additional hardware-derived cases before stronger claims.
-The existing PPU/CPU compatibility limits still apply. M7 remains responsible
-for emulated video presentation, input UI, and combined audio/video pacing.
+The existing PPU/CPU compatibility limits still apply. The [desktop frontend](DESKTOP.md)
+owns emulated video presentation, input UI and combined audio/video pacing.
 
-## Validation
+## Initial M6 validation (historical)
+
+For final combined playback acceptance, see the [MVP baseline](MVP_ACCEPTANCE.md#accepted-baseline).
+The counts and audio-only buffering below describe M6, not current desktop pacing.
 
 Windows 11 (build 26200), AMD Ryzen AI Max+ 395, MSVC 19.44, SDL 3.4.14:
 CMake configure/build and all 14 CTest suites pass in Debug and Release, including
@@ -125,7 +128,8 @@ unsatisfied SDL requests and a peak source queue of 12,844 bytes. It generated
 also reported zero starvation.
 These are stream diagnostics; audible output was not independently assessed.
 See [Desktop verification](DESKTOP.md#validation) for combined frontend smoke
-checks. Physical Linux audio/gamepad acceptance remains an M8 gate.
+checks. The final native Linux smoke session was manually approved in M8;
+physical gamepad and other peripheral coverage remains limited to recorded tests.
 
 Linux Debug/Release and ASan/UBSan with leak detection pass all 14 suites in
 [CI run 43655211909](https://github.com/particlesector/retro-silicon-emulator/actions/runs/43655211909).

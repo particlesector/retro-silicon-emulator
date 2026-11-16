@@ -22,14 +22,19 @@ void run() {
     const auto cartridge=rse::acceptance::av_input_program().cartridge();
     rse::desktop::Playback producer(audio.get());
     producer.replace(std::make_unique<rse::nes::Machine>(cartridge,rse::nes::Profile{.capture_audio=true}));
-    producer.buttons(1);producer.active(true);wait([&]{return producer.ready();});producer.active(false);
+    producer.buttons(0xff);producer.active(true);wait([&]{return producer.ready();});producer.active(false);
     const auto primed=producer.state();
+    check(primed.buttons==0xff,"initial all-buttons input was not scheduled");
     rse::nes::Machine reference(cartridge,rse::nes::Profile{.capture_audio=true});
-    reference.schedule_input(1,1);reference.advance_to(primed.tick);
+    reference.schedule_input(1,0xff);reference.advance_to(primed.tick);
     check(primed.cpu==reference.state().cpu && primed.cpu_cycles==reference.state().cpu_cycles,"producer changed CPU execution");
     for(unsigned address=0;address<2048;++address)
         check(producer.memory(address)==reference.inspect_memory(address),"producer changed RAM");
     check(producer.stats().samples==reference.take_audio().size(),"producer PCM clock mismatch");
+    rse::video::PpuFrame visible;
+    check(primed.ppu.frames>=2 && producer.update_frame(visible),"latest-frame handoff missing");
+    check(visible.number==reference.frame().number && visible.samples==reference.frame().samples,"handoff returned a stale frame");
+    check(!producer.update_frame(visible),"unchanged frame reported as new");
     SDL_Delay(40);check(producer.tick()==primed.tick,"paused producer advanced");
 #ifdef NDEBUG
     // Model a blocked GUI without servicing producer commands. Audio must keep
@@ -42,7 +47,19 @@ void run() {
 #endif
     producer.active(false);check(SDL_PauseAudioStreamDevice(audio.get()),"pause dummy device");
     check(SDL_ClearAudioStream(audio.get()),"clear dummy device");producer.reset();
-    check(producer.tick()==0 && producer.memory(0)==0,"producer reset did not reconstruct machine");
+    check(producer.tick()==0 && producer.memory(0)==0 && producer.state().buttons==0,"producer reset did not reconstruct machine");
+    check(producer.update_frame(visible) && visible.number==0,"reset retained a published frame");
+    for(bool replace:{false,true}) {
+        check(SDL_ClearAudioStream(audio.get()),"clear before input replay");
+        if(replace) {
+            producer.replace(std::make_unique<rse::nes::Machine>(cartridge,rse::nes::Profile{.capture_audio=true}));
+            check(producer.update_frame(visible) && visible.number==0,"replacement retained a published frame");
+        }
+        producer.buttons(0xff);producer.active(true);wait([&]{return producer.ready();});producer.active(false);
+        check(producer.state().buttons==0xff,replace?"replacement lost all-buttons input":"reset lost all-buttons input");
+        check(producer.update_frame(visible) && visible.number==producer.state().ppu.frames,"input replay did not publish the latest frame");
+    }
+    check(SDL_ClearAudioStream(audio.get()),"clear before faulted replacement");
     NesProgram bad;bad.emit({0x02});producer.replace(std::make_unique<rse::nes::Machine>(bad.cartridge(),rse::nes::Profile{.capture_audio=true}));
     producer.active(true);wait([&]{return !producer.error().empty();});producer.active(false);
     check(SDL_ClearAudioStream(audio.get()),"clear faulted stream");
@@ -53,6 +70,9 @@ void run() {
 }
 int main() {
     SDL_SetHint(SDL_HINT_AUDIO_DRIVER,"dummy");
+    // Prime several frames while paused, so latest-frame selection is checked
+    // deterministically without relying on real-time consumption or GPU work.
+    SDL_SetHint(SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES,"2048");
     if(!SDL_Init(SDL_INIT_AUDIO)){std::cerr<<SDL_GetError();return 1;}
     int result=0;try{run();}catch(const std::exception& e){std::cerr<<e.what()<<'\n';result=1;}
     SDL_Quit();return result;

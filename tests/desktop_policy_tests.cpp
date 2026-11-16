@@ -31,11 +31,6 @@ void policy() {
     Input input;input.key(1,true);input.gamepad(2);check(input.buttons()==3,"input OR");
     input.focus(false);check(input.buttons()==0,"focus release");input.key(8,true);input.focus(true);
     check(input.buttons()==2,"background key ignored");input.gamepad(0);check(input.buttons()==0,"gamepad disconnect");
-    VideoTimeline video;rse::video::PpuFrame f;f.number=1;video.push(f,800);f.number=2;video.push(f,1600);
-    check(!video.advance(799) && video.visible().number==0,"early video presentation");
-    check(video.advance(800) && video.visible().number==1 && video.queued()==1,"matched PCM position");
-    check(video.advance(2000) && video.visible().number==2 && video.queued()==0,"late presentation catches up");
-    video.reset();check(video.visible().number==0 && video.queued()==0,"reset drops old video");
 }
 void replay() {
     auto p=rse::acceptance::av_input_program();const auto rom=p.cartridge();

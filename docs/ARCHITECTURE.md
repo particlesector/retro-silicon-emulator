@@ -8,7 +8,7 @@ important long-term goals. The NES is the first concrete product; Apple IIe and
 custom machines should reuse chip models with explicit adapters and machine-owned
 wiring. See [Project vision](VISION.md) for the fuller product direction, component
 compatibility, workbench, diagnostics, and FPGA verification goals. The
-[MVP roadmap](ROADMAP.md) remains the authority for first MVP scope.
+[Roadmap](ROADMAP.md) records the accepted MVP baseline and current milestone scope.
 
 ## Layers
 - `rse_core`: platform-independent components, scheduler, buses, machine lifecycle and state management.
@@ -80,7 +80,7 @@ producer while presenting its newest completed frame. Verification is
 limited to its documented fixtures, hosts, and renderer readback cases.
 
 ## Next milestone
-Follow the [MVP roadmap](ROADMAP.md) and its acceptance gates for remaining work.
+Follow the [Roadmap](ROADMAP.md) and its acceptance gates for remaining work.
 
 ## Simulation fidelity and execution speed
 

@@ -1,154 +1,168 @@
-# First emulator MVP
+# Development roadmap
 
-For the broader original product direction, see [Project vision](VISION.md).
-This roadmap covers the first NROM MVP; its milestone numbering supersedes the
-earlier proposal's broader release phases.
+[Project vision](VISION.md) preserves the long-term direction;
+[Architecture](ARCHITECTURE.md) defines the boundaries. This roadmap records the
+completed NES MVP and the next bounded steps toward reusable machine sessions.
+Milestone numbering continues from M8 so earlier references remain meaningful.
 
-## Scope
+## Completed baseline: M1-M8
 
-The first MVP loads supported NES cartridges and provides verified execution,
-video, audio, and controller input through the desktop frontend on Windows and
-Linux. Target NTSC NES hardware and mapper 0 (NROM), with PRG ROM and CHR ROM or
-CHR RAM. Support one standard controller and horizontal or vertical mirroring.
+The first NTSC NROM MVP is complete. Its contracts and evidence remain in the
+linked documents; the historical checklists are retained in Git history.
 
-Defer PAL, other mappers, NES 2.0, battery saves, save states, rewind, debugger
-UI, additional peripherals, GPU compute acceleration, and other systems.
-FPGA equivalence and signal-level simulation are separate future goals.
+| Milestones | Delivered | Contracts and evidence |
+| --- | --- | --- |
+| M1-M2 | Deterministic lifecycle/timing, memory buses and bounded cartridge loading | [Core](CORE_TIMING.md), [NES memory](NES_MEMORY.md) |
+| M3-M4 | Reusable NMOS 6502 with explicit Ricoh variant, and NTSC 2C02 video model | [CPU](CPU_6502.md), [PPU](PPU_2C02.md) |
+| M5-M6 | NES wiring/clocks, controller input, OAM/DMC DMA, interrupts and deterministic five-channel PCM | [NES system](NES_SYSTEM.md), [APU/audio](APU_2A03.md) |
+| M7 | Windows/Linux desktop, Vulkan presentation, controls, loading/reset/error recovery and Release packaging | [Desktop](DESKTOP.md) |
+| M8 | Frozen legal fixtures, replay/hash checks, desktop responsiveness improvements and cross-platform acceptance | [MVP acceptance](MVP_ACCEPTANCE.md) |
+
+Supported cartridges remain clean NTSC iNES mapper 0, 16/32 KiB PRG, CHR ROM or
+CHR RAM, horizontal/vertical mirroring and one standard controller. This is a
+tested subset, not a claim of full NES accuracy or broad game compatibility.
+
+At M8 acceptance, the desktop build had 18 automated suites and the frontend-free
+build had 17.
+Windows ten-minute Release endurance is recorded with runtime counters. Native
+Ubuntu 24.04 LTS ten-minute smoke testing and SMB1 gameplay were manually
+approved by the project owner; unavailable hardware/counter details are noted
+in the acceptance record. Software response observations are approximately
+28-32 ms on the recorded Windows host, not a guaranteed physical latency.
 
 ## Completion rules
 
-- Complete each milestone's checklist before marking it done. Use small PRs.
-- Before implementation, name the milestone's reference tests, expected results,
-  and observation boundaries. Record sources and licensing for external assets;
-  do not bundle copyrighted game ROMs or proprietary firmware.
-- Behavioral checks must run in Debug and Release. CMake configure, build, and
-  CTest must pass for affected targets; the core must remain independent of SDL3
-  and Vulkan.
-- New requirements outside these checklists go into follow-up work. Change MVP
-  scope explicitly before treating them as acceptance blockers.
-- Visual plausibility alone does not establish timing accuracy. Record exact
-  test results and limitations before making accuracy claims.
+- Use small reviewable PRs. Complete a milestone's acceptance criteria before
+  marking it done; add new scope explicitly rather than expanding a checklist
+  during implementation.
+- Before changing behavior, name the reference cases, expected results and
+  observation boundaries. Preserve the frozen M8 fixture bytes and captures;
+  investigate mismatches rather than silently updating expected values.
+- Run CMake configure/build and affected CTest suites in Debug and Release.
+  Keep headless core, chip models, system adapters and session code free of
+  SDL3/Vulkan dependencies. Host devices and presentation belong in the frontend.
+- For playback changes, compare pacing/response using the same host and
+  procedure, and verify input, colors, tear-free presentation and audio
+  continuity. Record results and limits; visual plausibility alone is not an
+  accuracy test. Repeat platform endurance when the playback path changes.
+- Keep chip responsibilities and explicit variants reusable. Board wiring,
+  memory maps and clock conversion remain system-owned. Preserve specialized
+  execution paths; profile before introducing performance optimizations.
+- Record source/license/version for external test assets. Do not bundle game
+  ROMs or proprietary firmware. Manual approvals must be identified as such.
 
-## 1. Core timing and lifecycle
+## M9. Post-MVP cleanup
 
-Contract and evidence: [Core timing and lifecycle](CORE_TIMING.md).
+Goal: make the verified implementation easier to maintain before changing its
+application boundary.
 
-- [x] Document tick units, equal-time ordering, clock-domain conversion, and
-  whether the target timestamp is included when advancing.
-- [x] Define registration, ownership, reset, invalid input, and component failure
-  behavior, including the state callers may observe after a failure.
-- [x] Test multiple components, deterministic ordering, equal timestamps, rewind
-  rejection, null registration, registration after advancement, and reset.
-- [x] Repeated runs and different advancement chunk sizes produce identical
-  results for the same initial state and scheduled inputs.
+Acceptance criteria:
 
-## 2. Memory bus and cartridge loading
+- [x] Remove the unused `VideoTimeline`/`VideoPacket` implementation and tests
+  that only exercise the obsolete playback path. Retain coverage for the current
+  latest-frame handoff and producer lifecycle.
+- [x] Replace the `255` uninitialized-input sentinel with explicit state. Test
+  initial input with all eight button bits set, plus reset/replacement behavior.
+- [x] Extract the smoke driver and its diagnostics from application orchestration
+  behind a small internal test boundary; retain the existing scripted assertions
+  without exposing production ownership solely for testing.
+- [x] Name timing/buffering constants and clarify locking, priming, pause,
+  replacement and shutdown order. Preserve their tested values and behavior.
+- [x] Put final accepted results first in validation documentation; clearly label
+  historical failures and superseded builds. Keep supporting evidence and the
+  README's concise build/use focus.
+- [x] Existing deterministic captures and CLI behavior remain unchanged. All
+  affected suites and desktop smoke checks pass with no playback regression.
 
-Contract and evidence: [NES memory and cartridge loading](NES_MEMORY.md).
+Verification and limits: [M9 cleanup validation](DESKTOP.md#m9-cleanup-validation).
 
-- [x] Parse supported iNES mapper 0 images with bounded reads and explicit size
-  validation; document handling of trainers, flags, and unsupported variants.
-- [x] Reject malformed, truncated, and unsupported cartridges with clear errors.
-- [x] Test CPU RAM mirroring, NROM PRG mapping, CHR ROM/RAM access, nametable
-  mirroring, and the chosen unmapped-read and ROM-write behavior.
-- [x] Verify memory maps using synthetic fixtures without frontend dependencies.
+## M10. Common machine-session contract and NES adapter
 
-## 3. Reusable 6502 and Ricoh CPU variant
+Goal: define the small application interface needed by today's machine and a
+test system, while preserving the existing NES scheduler and chip APIs.
 
-Use a reusable NMOS 6502 engine with an explicit Ricoh variant; keep NES board
-wiring, APU, and DMA outside the instruction engine.
-Contract and reference plan: [6502 CPU](CPU_6502.md).
+Acceptance criteria:
 
-- [x] Implement all documented instructions, addressing modes, flags, stack
-  operations, reset, IRQ, and NMI, including 2A03 decimal-mode behavior.
-- [x] Verify instruction results and timestamped bus accesses, including branch
-  and page-crossing timing and interrupt entry, against named reference cases.
-- [x] Define unsupported opcode behavior explicitly; add undocumented opcodes
-  only when required by the agreed MVP acceptance programs.
-- [x] Automated tests compare CPU state and cycle counts with pinned expected
-  results and report the first mismatch.
+- [ ] Document an internal C++ session contract for reset, bounded advancement,
+  timestamped input, frame/audio delivery and basic status/errors. Define clock
+  units, ownership/lifetimes, absent outputs, buffering and failure behavior.
+- [ ] Describe outputs through system-provided metadata: rational clock rate,
+  video dimensions/display aspect and pixel representation, audio format/rate,
+  and supported input actions. NES palette interpretation belongs in its adapter;
+  do not assume every system has a PPU, fixed frame size or NES button mask.
+- [ ] Implement a built-in `nes-ntsc` factory and NES session adapter. Cartridge
+  rules, clock conversion, chip-specific inspection and wiring stay on the system
+  side. Keep specialized diagnostics outside the common status contract.
+- [ ] Keep the current NES timing path intact. Interface dispatch occurs at
+  session operations rather than adding a universal per-chip/per-cycle layer.
+  No dynamic plugin loading or stable binary ABI is introduced.
+- [ ] Test the contract with both the NES adapter and a test-only fake system
+  using different timing and video dimensions, including absent audio/video and
+  unsupported-operation/error cases. The fake is not a second emulator product.
+- [ ] NES adapter runs match direct-machine state, events, frames and PCM for the
+  same reset and input timeline, including different advancement chunk sizes.
+  Contract tests run without SDL3/Vulkan and public interfaces are documented.
 
-## 4. PPU and video
+## M11. Move CLI and desktop onto machine sessions
 
-Contract, reference cases, and golden frames: [2C02 PPU](PPU_2C02.md).
+Goal: remove NES assumptions from reusable application code while retaining the
+current user experience and measured playback behavior.
 
-- [x] Implement CPU-visible registers, VRAM/OAM access, scrolling, background and
-  sprite output, palette selection, and supported mirroring behavior.
-- [x] Test sprite priority, sprite-zero hit, sprite overflow behavior, vblank,
-  NMI generation, and register side effects at defined timing boundaries.
-- [x] Verify frame timing and selected register/bus events against reference
-  cases, including rendering-time register writes.
-- [x] Produce deterministic frames in headless tests and compare selected frame
-  hashes against recorded expected output with a fixed palette.
+Acceptance criteria:
 
-## 5. System integration and input
+- [ ] CLI, desktop playback and audio-only playback use the common session and
+  built-in factory. Generic application code no longer constructs `nes::Machine`
+  or depends on CPU/PPU state types. Keep NES-specific formatting and adapters
+  outside generic execution/presentation code.
+- [ ] Replace hardcoded NES tick conversions, frame dimensions, palette handling
+  and input/media assumptions with session metadata and adapter behavior.
+  Preserve the current default NES workflow and actionable cartridge errors;
+  unknown system identifiers fail explicitly.
+- [ ] Preserve existing CLI commands, exit codes and documented NES JSON output
+  through a compatibility path; do not silently redefine the existing format.
+- [ ] Exercise generic CLI/playback and video layout with the fake system as well
+  as NES. Verify reset/replacement, unsupported capabilities, output lifetime,
+  bounded queues and fault recovery without adding a public fake-system option.
+- [ ] Keep emulation/audio production independent of GUI waits. On the recorded
+  comparison host, establish the acceptable baseline variation before changing
+  pacing, then demonstrate no material response/pacing regression. Retain the
+  corrected colors, aspect ratio, controls and tear-free presentation.
+- [ ] Frozen NES captures and Debug/Release checks pass. Extracted Windows/Linux
+  Release packages pass the scripted flow and ten-minute audio-continuity check.
+  Record any owner-approved manual evidence and measurement limits explicitly.
+- [ ] Update architecture/build/use documentation to match the implemented
+  boundary. Adding another built-in adapter should not require rewriting generic
+  frontend timing, video upload or audio production.
 
-Contract, fixtures, and headless runner: [NES system integration](NES_SYSTEM.md).
+## Configuration approach
 
-- [x] Connect CPU, PPU, cartridge, and controller through the documented NTSC
-  clock relationship and memory map.
-- [x] Verify OAM DMA transfers, CPU stalls, and NMI/IRQ delivery and ordering.
-- [x] Test controller strobe and serial reads with recorded button sequences.
-- [x] Run selected NROM programs headlessly for a fixed simulated duration;
-  repeated runs produce identical state, event, and frame checksums.
+M10-M11 introduce statically registered C++ factories; the validated C++ NES
+definition remains authoritative. Selecting `nes-ntsc` is sufficient for this phase.
 
-## 6. APU and audio
+Application preferences (controls, window/audio settings) and executable machine
+definitions are separate concerns. JSON may be used for either later, but these
+milestones do not add a settings framework or a machine-description parser.
 
-Contract, reference cases, and playback checks: [2A03 APU](APU_2A03.md).
+Introduce versioned JSON machine manifests only when another real system or
+custom-machine use case establishes the required chip variants, clocks, wiring,
+memory maps and boot contract. Registered C++ components still implement chip
+behavior. A future loader must reject invalid or unsupported combinations and
+prove equivalence with the corresponding validated built-in definition.
 
-- [x] Implement pulse, triangle, noise, and DMC channels, register behavior,
-  frame sequencing, and audio mixing.
-- [x] Test channel timing, frame/DMC interrupts, sample fetching, CPU stalls,
-  and interactions with OAM DMA using named reference cases.
-- [x] Generate deterministic audio samples for fixed initial state and inputs
-  at a documented sample rate; compare with recorded expected results.
-- [x] Desktop audio plays continuously in the agreed smoke-test session without
-  sustained underruns; host audio timing does not change simulated execution.
+## Later work: scope separately
 
-## 7. Desktop MVP
+Select the next product milestone after M11 and define its fixtures, acceptance
+criteria and firmware/licensing needs before implementation. These directions
+remain visible in [Project vision](VISION.md), but are not M9-M11 requirements:
 
-Contract, controls, packages, and verification: [Desktop MVP](DESKTOP.md).
-
-- [x] Select a cartridge, start execution, reset, and exit normally; invalid or
-  unsupported cartridges produce an actionable error.
-- [x] Present the emulated frame through Vulkan with a preserved aspect ratio;
-  window resizing and closing work on Windows and Linux.
-- [x] Map a documented keyboard layout and one standard gamepad to NES input;
-  losing window focus clears held keyboard buttons.
-- [x] Provide real-time pacing and synchronized video/audio without changing
-  deterministic core results.
-- [x] Build Release packages with required runtime dependencies and verify
-  launch, video, audio, input, reset, and exit on both supported platforms.
-
-## 8. MVP acceptance
-
-Frozen programs, procedures, and evidence: [MVP acceptance](MVP_ACCEPTANCE.md).
-
-- [x] Freeze a small acceptance set of legally available NROM programs before
-  desktop acceptance testing. Record versions/hashes, license/source, inputs,
-  duration, and expected results. Cover video, audio, input, and reset.
-- [x] All earlier milestone checklists and the named automated reference suite
-  pass; test failures cannot be waived by a successful visual demo.
-- [x] Record successful Release smoke tests on Windows and Linux, including a
-  continuous 10-minute session on each platform with no crash or sustained
-  audio underruns. Record host hardware and pacing performance.
-  Native Ubuntu 24.04 LTS testing was manually approved by the project owner;
-  unavailable hardware/counter details are explicitly noted in the acceptance record.
-- [x] Publish reproducible build/run/test instructions, supported cartridge
-  constraints, test results, and remaining limitations.
-- [x] Keep deferred features outside the MVP release; make no NES accuracy,
-  Vulkan rendering, or FPGA equivalence claims beyond recorded verification.
-
-## After the MVP
-
-Retain these directions for separately scoped follow-up milestones, rather than
-adding them to the acceptance gates above:
-
-- Broader NES compatibility: NES 2.0, MMC1/MMC3 and board variants, atomic save
-  RAM, additional regions/peripherals, and compatibility-driven unofficial opcodes.
-- Developer verification: richer headless execution/captures, versioned traces,
-  snapshots, non-mutating inspection, and a reproducible FPGA comparison workflow.
-- Proven reuse: Apple IIe, educational/custom machines, explicit CPU variants,
-  firmware/boot contracts, and validated machine manifests.
-- Visual workbench: typed connections, compatibility validation, clock/memory
-  editors, and chip/signal inspection after working machines prove the contracts.
+- Broader NES compatibility: NES 2.0, additional mappers/board variants, atomic
+  battery saves, regions/peripherals and compatibility-driven unofficial opcodes.
+- Proven chip reuse in another real machine, with Apple IIe a candidate; educational
+  and experimental machines follow explicit component and boot contracts.
+- Diagnostics: richer headless captures/traces, non-mutating inspection,
+  save states/rewind and reproducible Retro Silicon FPGA comparison.
+- Validated machine manifests and a visual workbench for typed connections,
+  clocks, memory maps and chip/signal inspection.
+- Other systems, GPU compute acceleration and optional signal-level models only
+  when separately scoped tests demonstrate their value. No FPGA equivalence or
+  analog-output accuracy claim follows from completing the NES MVP.

@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
-#include <deque>
 
 namespace rse::desktop {
 struct Rgb {std::uint8_t r{},g{},b{},a{255};bool operator==(const Rgb&) const=default;};
@@ -50,24 +49,5 @@ public:
     [[nodiscard]] std::uint8_t buttons() const noexcept {return focused_ ? keys_|pad_ : 0;}
 private:
     std::uint8_t keys_{},pad_{};bool focused_{true};
-};
-struct VideoPacket {video::PpuFrame frame;std::uint64_t sample_end{};};
-// Frames become visible at their publication time on the consumed PCM timeline.
-// Pending packets are bounded by the host audio queue, not wall-clock frame rate.
-class VideoTimeline {
-public:
-    void push(const video::PpuFrame& frame,std::uint64_t sample_end) {pending_.push_back({frame,sample_end});}
-    bool advance(std::uint64_t consumed) {
-        bool changed=false;
-        while (!pending_.empty() && pending_.front().sample_end<=consumed) {
-            visible_=std::move(pending_.front().frame);pending_.pop_front();changed=true;
-        }
-        return changed;
-    }
-    void reset() {pending_.clear();visible_={};}
-    [[nodiscard]] const video::PpuFrame& visible() const noexcept {return visible_;}
-    [[nodiscard]] std::size_t queued() const noexcept {return pending_.size();}
-private:
-    video::PpuFrame visible_;std::deque<VideoPacket> pending_;
 };
 } // namespace rse::desktop

@@ -12,7 +12,8 @@ ratio with letterboxing. This is not composite-video or analog color emulation.
 Acceptance cases, specified before implementation:
 
 - `desktop-policy`: palette/emphasis conversion, 4:3 viewport bounds, input
-  combination/focus release, and frame selection against consumed PCM positions.
+  combination/focus release. Latest-frame handoff and reset/replacement are
+  covered by `desktop-playback-tests`.
 - `desktop-replay`: the same frame-boundary input sequence and frame count
   produce identical machine state, frames, and PCM under different host budgets.
 - `desktop-smoke`: a project-owned generated NROM fixture exercises visible
@@ -25,8 +26,8 @@ Acceptance cases, specified before implementation:
   physical Linux GPU, controller, or sound device was tested.
 
 The M1-M6 reference suites must continue to pass. No game ROMs or proprietary
-firmware are used by the smoke tests. M8's ten-minute physical-host acceptance
-session and frozen compatibility set remain separate gates.
+firmware are used by the smoke tests. The completed M8 endurance
+and frozen-set acceptance record is linked below.
 
 ## Use
 
@@ -156,25 +157,38 @@ does not establish physical gamepad compatibility or subjective audio quality.
 
 ## Validation
 
-All 15 CTest suites pass in Windows/MSVC and Linux/GCC Debug and Release;
-Linux ASan/UBSan with leak detection also passes. Chip reference fixtures remain
-unchanged. The desktop replay verifies 120 frames of identical CPU/frame/PCM
-observations across different advancement chunks.
+The [accepted MVP baseline](MVP_ACCEPTANCE.md#accepted-baseline) records the
+Windows endurance counters, native Ubuntu manual approval, response-measurement
+limits and frozen fixtures. [Historical validation](MVP_VALIDATION_HISTORY.md)
+retains the earlier M7/M8 results and failures without redefining current pacing.
 
-On November 14, 2026, an extracted Windows Release ZIP ran for 30 seconds on
-Windows 11 build 26200, AMD Ryzen AI Max+ 395 / Radeon 8060S, SDL 3.4.14 and WASAPI.
-It generated 1,801 frames, made two successful loads and one reset, recovered
-from three expected file errors, passed five Vulkan readback checks, and reported
-zero starvation. Startup buffering was then increased to 120-137 ms to cover
-software Vulkan initialization; subsequent Windows smoke checks also pass.
-The native Windows picker, visible emulated frame, reset/exit, and readable
-welcome screen were inspected interactively.
+The current desktop build has 18 CTest suites. `desktop-playback-tests` checks
+the actual latest-frame handoff, initial all-buttons input, reset/replacement,
+headless equivalence and fault recovery. The extracted smoke driver lives in
+`apps/desktop/smoke.cpp`; its internal `SmokeHost` view exposes observations and
+commands rather than owning window, gamepad or machine handles. Smoke response
+metrics are kept outside application orchestration. Timing policy values are
+named in `playback_timing.hpp`; cleanup does not change them.
 
-The extracted Linux Release ZIP passed the same 30-second flow in
-[CI run 43672447350](https://github.com/particlesector/retro-silicon-emulator/actions/runs/43672447350):
-Ubuntu 24.04.5, SDL 3.4.14, Xvfb/Openbox, Mesa 25.2.8 lavapipe (llvmpipe), dummy
-audio and a virtual standard gamepad. It generated 1,823 frames, passed five
-Vulkan readback checks, and reported zero starvation with a peak source queue
-of 13,116 bytes. Linux native GPU, physical audio/gamepad, Wayland, and native
-file-portal behavior are not established by this virtual-display check.
-M8 retains the frozen compatibility set and ten-minute physical-host sessions.
+### M9 cleanup validation
+
+On November 15, 2026, all 18 suites passed in Windows/MSVC Debug and Release
+and local Ubuntu/GCC Release. The new initial `0xff` input regression failed on
+the M8 implementation before the sentinel fix; reset/replacement input and latest
+frame checks now pass. Frozen fixture bytes/captures and CLI behavior are unchanged.
+
+The Windows Vulkan/WASAPI 30-second smoke run reported zero starvation, five
+readbacks, 29,876 simulated ms in 30,000 elapsed ms and four input responses
+averaging 32,513 us. In a subsequent same-host five-second comparison, the
+accepted M8 executable averaged 24,584 us and the extracted M9 package averaged
+22,736 us; both had zero starvation and a 1,152-byte source target. These are
+small software measurements subject to refresh/host variation, not evidence of
+a new physical latency guarantee. Logs are under `build/m9/windows-smoke.*.log`,
+`baseline-5s.*.log` and `package-5s.*.log` on the test host.
+
+The extracted Linux Release package passed the 30-second Xvfb/Openbox/lavapipe
+flow with dummy audio, zero starvation, five readbacks and four input responses.
+The six-second interruption test still failed with the expected early-exit
+message. Logs are `build/m9/linux-package.*.log` and `linux-early-exit.log`.
+These are virtual-display checks; the native Ubuntu owner approval in the
+accepted baseline remains M8 evidence, not a new physical M9 test.
