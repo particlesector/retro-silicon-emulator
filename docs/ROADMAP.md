@@ -83,25 +83,27 @@ test system, while preserving the existing NES scheduler and chip APIs.
 
 Acceptance criteria:
 
-- [ ] Document an internal C++ session contract for reset, bounded advancement,
+- [x] Document an internal C++ session contract for reset, bounded advancement,
   timestamped input, frame/audio delivery and basic status/errors. Define clock
   units, ownership/lifetimes, absent outputs, buffering and failure behavior.
-- [ ] Describe outputs through system-provided metadata: rational clock rate,
+- [x] Describe outputs through system-provided metadata: rational clock rate,
   video dimensions/display aspect and pixel representation, audio format/rate,
   and supported input actions. NES palette interpretation belongs in its adapter;
   do not assume every system has a PPU, fixed frame size or NES button mask.
-- [ ] Implement a built-in `nes-ntsc` factory and NES session adapter. Cartridge
+- [x] Implement a built-in `nes-ntsc` factory and NES session adapter. Cartridge
   rules, clock conversion, chip-specific inspection and wiring stay on the system
   side. Keep specialized diagnostics outside the common status contract.
-- [ ] Keep the current NES timing path intact. Interface dispatch occurs at
+- [x] Keep the current NES timing path intact. Interface dispatch occurs at
   session operations rather than adding a universal per-chip/per-cycle layer.
   No dynamic plugin loading or stable binary ABI is introduced.
-- [ ] Test the contract with both the NES adapter and a test-only fake system
+- [x] Test the contract with both the NES adapter and a test-only fake system
   using different timing and video dimensions, including absent audio/video and
   unsupported-operation/error cases. The fake is not a second emulator product.
-- [ ] NES adapter runs match direct-machine state, events, frames and PCM for the
+- [x] NES adapter runs match direct-machine state, events, frames and PCM for the
   same reset and input timeline, including different advancement chunk sizes.
   Contract tests run without SDL3/Vulkan and public interfaces are documented.
+
+Verification and limits: [M10 session validation](SESSIONS.md#validation).
 
 ## M11. Move CLI and desktop onto machine sessions
 
