@@ -15,9 +15,9 @@ Build abstractions from real machine requirements, not speculative universality.
 
 This document preserves the long-term intent of the original 2026-11-13 technical
 specification. [Architecture](ARCHITECTURE.md) describes design boundaries and
-current contracts. [Roadmap](ROADMAP.md) defines the narrower first MVP and its
-acceptance gates. Future directions here are not additional MVP requirements or
-claims of implemented functionality.
+current contracts. [Roadmap](ROADMAP.md) records the completed first MVP and the
+current milestones and acceptance gates. Future directions here are not additional
+milestone requirements or claims of implemented functionality.
 
 ## Product surfaces
 

@@ -4,6 +4,7 @@
 #include <SDL3/SDL.h>
 #include <condition_variable>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <thread>
 
@@ -46,7 +47,8 @@ private:
     std::unique_ptr<nes::Machine> machine_;
     video::PpuFrame latest_;
     PlaybackStats stats_;
-    std::uint8_t buttons_{},scheduled_buttons_{255};
+    std::uint8_t buttons_{};
+    std::optional<std::uint8_t> scheduled_buttons_;
     bool active_{},ready_{},quit_{};
     std::string error_;
     std::thread worker_;

@@ -88,7 +88,7 @@ if(RSE_BUILD_DESKTOP)
   find_package(SDL3 3.2 CONFIG REQUIRED COMPONENTS SDL3-shared)
   find_package(Vulkan REQUIRED)
   add_executable(rse-desktop apps/desktop/main.cpp apps/desktop/audio_player.cpp
-    apps/desktop/application.cpp apps/desktop/display.cpp apps/desktop/playback.cpp)
+    apps/desktop/application.cpp apps/desktop/display.cpp apps/desktop/playback.cpp apps/desktop/smoke.cpp)
   target_link_libraries(rse-desktop PRIVATE rse_nes SDL3::SDL3-shared Vulkan::Vulkan Threads::Threads)
   if(RSE_BUILD_TESTS)
     add_executable(rse-desktop-playback-tests tests/desktop_playback_tests.cpp apps/desktop/playback.cpp)
