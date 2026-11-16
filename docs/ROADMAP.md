@@ -125,7 +125,7 @@ Acceptance criteria:
 - [x] Exercise generic CLI/playback and video layout with the fake system as well
   as NES. Verify reset/replacement, unsupported capabilities, output lifetime,
   bounded queues and fault recovery without adding a public fake-system option.
-- [ ] Keep emulation/audio production independent of GUI waits. On the recorded
+- [x] Keep emulation/audio production independent of GUI waits. On the recorded
   comparison host, establish the acceptable baseline variation before changing
   pacing, then demonstrate no material response/pacing regression. Retain the
   corrected colors, aspect ratio, controls and tear-free presentation.
