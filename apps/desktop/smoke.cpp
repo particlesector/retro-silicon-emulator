@@ -1,12 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "smoke.hpp"
 #include "display.hpp"
+#include <rse/systems/nes/session.hpp>
+#include <rse/systems/nes/palette.hpp>
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
 #include <utility>
 
 namespace rse::desktop {
+std::optional<std::uint8_t> smoke_memory(const session::Session& machine,std::uint16_t address) {
+    const auto* nes=dynamic_cast<const nes::Session*>(&machine);
+    return nes?nes->diagnostics().inspect_memory(address):std::nullopt;
+}
 namespace {
 constexpr std::uint64_t first_stage_ms=500,stage_interval_ms=150,blocked_gui_ms=150;
 constexpr unsigned final_stage=16;
@@ -55,8 +61,11 @@ void Smoke::response(std::uint16_t sample) {
 }
 void Smoke::tick(SmokeHost& host,std::uint64_t elapsed) {
     const auto state=host.observation();
+    // Sessions have no published frame during initial load/reset. The overall
+    // duration/final-stage checks still fail if publication never resumes.
+    if(state.frame_samples.empty())return;
     expect(state.frame_samples.size()>response_pixel,"smoke frame dimensions changed");
-    if(input_start_ && state.frame_samples[response_pixel]==expected_sample_) {
+    if(input_start_ && state.frame_samples[response_pixel]==nes::display_color(expected_sample_)) {
         metrics_.record((SDL_GetTicksNS()-input_start_)/1000);
         input_start_=0;
     }
@@ -93,7 +102,7 @@ void Smoke::tick(SmokeHost& host,std::uint64_t elapsed) {
     case 5:expect(state.buttons==0,"gamepad release failed");key(SDL_SCANCODE_F5,true);break;
     case 6:
         expect(state.resets==1 && state.tick<20'000'000,"reset event failed");
-        expect(state.frame_number>0 && state.frame_samples[response_pixel]!=0,"smoke did not present an emulated color frame");
+        expect(state.frame_number>0 && state.frame_samples[response_pixel]!=nes::display_color(0),"smoke did not present an emulated color frame");
         host.resize_window(1000,480);host.request_readback();break;
     case 7:host.request_readback();host.resize_window(480,720);break;
     case 8:host.request_readback();drop("rse-nonexistent-smoke-fixture.nes");break;

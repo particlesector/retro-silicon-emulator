@@ -112,17 +112,17 @@ current user experience and measured playback behavior.
 
 Acceptance criteria:
 
-- [ ] CLI, desktop playback and audio-only playback use the common session and
+- [x] CLI, desktop playback and audio-only playback use the common session and
   built-in factory. Generic application code no longer constructs `nes::Machine`
   or depends on CPU/PPU state types. Keep NES-specific formatting and adapters
   outside generic execution/presentation code.
-- [ ] Replace hardcoded NES tick conversions, frame dimensions, palette handling
+- [x] Replace hardcoded NES tick conversions, frame dimensions, palette handling
   and input/media assumptions with session metadata and adapter behavior.
   Preserve the current default NES workflow and actionable cartridge errors;
   unknown system identifiers fail explicitly.
-- [ ] Preserve existing CLI commands, exit codes and documented NES JSON output
+- [x] Preserve existing CLI commands, exit codes and documented NES JSON output
   through a compatibility path; do not silently redefine the existing format.
-- [ ] Exercise generic CLI/playback and video layout with the fake system as well
+- [x] Exercise generic CLI/playback and video layout with the fake system as well
   as NES. Verify reset/replacement, unsupported capabilities, output lifetime,
   bounded queues and fault recovery without adding a public fake-system option.
 - [ ] Keep emulation/audio production independent of GUI waits. On the recorded
@@ -132,9 +132,11 @@ Acceptance criteria:
 - [ ] Frozen NES captures and Debug/Release checks pass. Extracted Windows/Linux
   Release packages pass the scripted flow and ten-minute audio-continuity check.
   Record any owner-approved manual evidence and measurement limits explicitly.
-- [ ] Update architecture/build/use documentation to match the implemented
+- [x] Update architecture/build/use documentation to match the implemented
   boundary. Adding another built-in adapter should not require rewriting generic
   frontend timing, video upload or audio production.
+
+Verification and remaining approval: [M11 validation](M11_VALIDATION.md).
 
 ## Configuration approach
 

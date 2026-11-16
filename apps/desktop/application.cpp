@@ -4,7 +4,9 @@
 #include "playback.hpp"
 #include "playback_timing.hpp"
 #include "smoke.hpp"
-#include <rse/systems/nes/machine.hpp>
+#include <rse/session/builtins.hpp>
+#include <rse/session/time.hpp>
+#include "nes_controls.hpp"
 #include <atomic>
 #include <iostream>
 #include <mutex>
@@ -30,22 +32,30 @@ std::uint8_t key_mask(SDL_Scancode key) {
 }
 class Application final : public SmokeHost {
 public:
-    explicit Application(bool test) : smoke(test) {
+    explicit Application(bool test,std::string_view system) : smoke(test),system_id(system) {
         window.reset(SDL_CreateWindow("Retro Silicon Emulator",960,720,SDL_WINDOW_RESIZABLE|SDL_WINDOW_HIGH_PIXEL_DENSITY));
         require_sdl(bool(window));display=std::make_unique<Display>(window.get());
-        SDL_AudioSpec spec{SDL_AUDIO_S16,1,timing::sample_rate};
-        audio.reset(SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,&spec,observe,this));
-        if (!audio) throw std::runtime_error(std::string("Audio device unavailable: ")+SDL_GetError());
-        playback=std::make_unique<Playback>(audio.get());
+        playback=std::make_unique<Playback>(nullptr);
         int count{};auto* ids=SDL_GetGamepads(&count);
         for (int i=0;i<count && !pad;++i) connect(ids[i]);SDL_free(ids);
     }
     void load(const std::filesystem::path& path) {
         try {
-            auto next=std::make_unique<nes::Machine>(nes::Cartridge::load_file(path),nes::Profile{.capture_audio=true});
+            auto next=session::load(system_id,path);
             const auto filename=path.filename().u8string();
             const auto title=std::string("Retro Silicon Emulator - ")+std::string(reinterpret_cast<const char*>(filename.data()),filename.size());
-            stop_audio();playback->replace(std::move(next));input.clear();visible={};running_audio=false;
+            if(next->info().audio && !audio) {
+                require_sdl(SDL_InitSubSystem(SDL_INIT_AUDIO));
+                const auto format=*next->info().audio;
+                SDL_AudioSpec spec{SDL_AUDIO_S16,int(format.channels),int(format.sample_rate)};
+                std::unique_ptr<SDL_AudioStream,decltype(&SDL_DestroyAudioStream)> stream(
+                    SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,&spec,observe,this),SDL_DestroyAudioStream);
+                if(!stream)throw std::runtime_error(std::string("Audio device unavailable: ")+SDL_GetError());
+                auto producer=std::make_unique<Playback>(stream.get());
+                producer->replace(std::move(next));
+                stop_audio();playback=std::move(producer);audio=std::move(stream);
+            } else {stop_audio();playback->replace(std::move(next));}
+            input.clear();visible={};running_audio=false;
             (void)SDL_SetWindowTitle(window.get(),title.c_str());redraw=true;++loads;
         } catch (const std::exception& e) {error(std::string("Cannot open cartridge: ")+e.what()+"\nChoose a supported mapper-0 iNES image. The previous cartridge is retained.");}
     }
@@ -94,7 +104,7 @@ public:
             for (unsigned i=0;i<8;++i) if (SDL_GetGamepadButton(pad.get(),map[i])) buttons|=1<<i;
         }
         input.gamepad(buttons);
-        playback->buttons(input.buttons());
+        playback->input(default_controls(system_id,input.buttons()));
         max_pump_work_us=std::max(max_pump_work_us,(SDL_GetTicksNS()-pump_start)/1000);
     }
     void idle() {
@@ -114,7 +124,7 @@ public:
         playback->active(playing);
         redraw=playback->update_frame(visible)||redraw;
         if (!minimized && (redraw || verify_next)) {display->draw(playback->loaded()?&visible:nullptr,smoke && verify_next);redraw=false;}
-        if (playing && !running_audio && playback->ready()) {require_sdl(SDL_ResumeAudioStreamDevice(audio.get()));running_audio=true;}
+        if (playing && playback->has_audio() && !running_audio && playback->ready()) {require_sdl(SDL_ResumeAudioStreamDevice(audio.get()));running_audio=true;}
         verify_next=false;
         max_step_work_us=std::max(max_step_work_us,(SDL_GetTicksNS()-step_start)/1000);
     }
@@ -122,13 +132,13 @@ public:
         // Serialize with the producer before touching its SDL stream. Retain
         // queued PCM for modal/minimize pauses; resume waits for priming.
         playback->active(false);
-        require_sdl(SDL_PauseAudioStreamDevice(audio.get()));
+        if(audio)require_sdl(SDL_PauseAudioStreamDevice(audio.get()));
         running_audio=false;
     }
     void stop_audio() {
         pause_audio();
         // Load/reset/fault recovery additionally discard the old timeline.
-        require_sdl(SDL_ClearAudioStream(audio.get()));
+        if(audio)require_sdl(SDL_ClearAudioStream(audio.get()));
     }
     void error(const std::string& message) {
         ++errors;std::cerr<<message<<'\n';
@@ -150,7 +160,7 @@ public:
                  <<" frames="<<stats.frames<<" loads="<<loads<<" resets="<<resets<<" errors="<<errors
                  <<" readbacks="<<display->readbacks()<<" peak_audio_bytes="<<stats.peak_audio
                  <<" peak_video_frames="<<stats.peak_video<<" starvation_requests="<<starvation.load()
-                 <<" elapsed_ms="<<elapsed_ms<<" simulated_ms="<<timing::simulated_ms(stats.ticks)
+                 <<" elapsed_ms="<<elapsed_ms<<" simulated_ms="<<stats.simulated_ms
                  <<" samples="<<stats.samples<<" max_chunk_work_us="<<stats.max_chunk_us
                  <<" target_audio_bytes="<<stats.target_bytes
                  <<" max_step_work_us="<<max_step_work_us<<" max_loop_gap_us="<<max_loop_gap_us
@@ -164,10 +174,12 @@ public:
     [[nodiscard]] bool has_machine() const {return playback->loaded();}
     [[nodiscard]] SmokeObservation observation() const override {
         return {running,playback->loaded(),input.buttons(),playback->tick(),visible.number,
-                playback->stats().samples,loads,resets,errors,display->readbacks(),starvation.load(),visible.samples};
+                playback->stats().samples,loads,resets,errors,display->readbacks(),starvation.load(),visible.pixels};
     }
     [[nodiscard]] std::optional<std::uint8_t> inspect_memory(std::uint16_t address) const override {
-        return playback->memory(address);
+        std::optional<std::uint8_t> value;
+        (void)playback->inspect([&](const session::Session& machine){value=smoke_memory(machine,address);return true;});
+        return value;
     }
     void select_gamepad(SDL_JoystickID id) override {
         pad.reset();
@@ -184,9 +196,10 @@ public:
 private:
     std::unique_ptr<SDL_Window,decltype(&SDL_DestroyWindow)> window{nullptr,SDL_DestroyWindow};
     std::unique_ptr<Display> display;
-    Input input;video::PpuFrame visible;
+    Input input;Frame visible;
     std::unique_ptr<SDL_Gamepad,decltype(&SDL_CloseGamepad)> pad{nullptr,SDL_CloseGamepad};
     bool running{true},verify_next{},smoke;
+    std::string system_id;
     unsigned loads{},resets{},errors{};
     std::atomic<unsigned> starvation{};
     static void SDLCALL observe(void* userdata,SDL_AudioStream*,int additional,int) {
@@ -211,10 +224,10 @@ private:
 
 }
 } // namespace rse::desktop
-int run_desktop(const std::filesystem::path& cartridge,unsigned seconds,bool smoke) {
+int run_desktop(const std::filesystem::path& cartridge,unsigned seconds,bool smoke,std::string_view system) {
     using namespace rse::desktop;
     try {
-        Application app(smoke);if (smoke) app.step();
+        Application app(smoke,system);if (smoke) app.step();
         if (!cartridge.empty()) app.load(cartridge);
         if (smoke && !app.has_machine()) throw std::runtime_error("smoke fixture could not be loaded");
         std::unique_ptr<Smoke> script;if (smoke) script=std::make_unique<Smoke>(cartridge);

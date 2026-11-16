@@ -11,20 +11,26 @@ Display::Display(SDL_Window* window) {
     if (std::string_view(backend())!="vulkan") throw std::runtime_error("Vulkan renderer was not selected");
     // The audio producer runs independently of this refresh wait.
     require_sdl(SDL_SetRenderVSync(renderer_.get(),1));
-    texture_.reset(SDL_CreateTexture(renderer_.get(),SDL_PIXELFORMAT_RGBA32,SDL_TEXTUREACCESS_STREAMING,256,240));
-    require_sdl(bool(texture_));require_sdl(SDL_SetTextureScaleMode(texture_.get(),SDL_SCALEMODE_NEAREST));
+
 }
-void Display::draw(const video::PpuFrame* frame,bool verify) {
+void Display::draw(const Frame* frame,bool verify) {
     auto* r=renderer_.get();int width{},height{};
     require_sdl(SDL_SetRenderLogicalPresentation(r,0,0,SDL_LOGICAL_PRESENTATION_DISABLED));
     require_sdl(SDL_GetRenderOutputSize(r,&width,&height));
     if (width<=0 || height<=0) return;
     require_sdl(SDL_SetRenderDrawColor(r,0,0,0,255));require_sdl(SDL_RenderClear(r));
-    const auto view=viewport(width,height);
-    if (frame) {
-        const auto image=pixels(*frame);
+    const auto view=viewport(width,height,frame?frame->format.display_aspect:session::Rational{4,3});
+    if(view.w<=0 || view.h<=0){require_sdl(SDL_RenderPresent(r));return;}
+    if (frame && frame->number && !frame->pixels.empty()) {
+        const auto fw=frame->format.width,fh=frame->format.height;
+        if(!texture_ || texture_width_!=fw || texture_height_!=fh) {
+            texture_.reset(SDL_CreateTexture(r,SDL_PIXELFORMAT_RGBA32,SDL_TEXTUREACCESS_STREAMING,int(fw),int(fh)));
+            require_sdl(bool(texture_));require_sdl(SDL_SetTextureScaleMode(texture_.get(),SDL_SCALEMODE_NEAREST));
+            texture_width_=fw;texture_height_=fh;
+        }
+        const auto& image=frame->pixels;
         static_assert(sizeof(Rgb)==4);
-        require_sdl(SDL_UpdateTexture(texture_.get(),nullptr,image.data(),256*sizeof(Rgb)));
+        require_sdl(SDL_UpdateTexture(texture_.get(),nullptr,image.data(),int(fw*sizeof(Rgb))));
         const SDL_FRect destination{float(view.x),float(view.y),float(view.w),float(view.h)};
         require_sdl(SDL_RenderTexture(r,texture_.get(),nullptr,&destination));
         if (verify) {
@@ -36,7 +42,7 @@ void Display::draw(const video::PpuFrame* frame,bool verify) {
             // Sample texture interiors away from scaling boundaries and check
             // every letterbox edge. Alpha is backend-specific; compare RGB.
             for (int y:{view.h/4,view.h/2,view.h*3/4}) for (int x:{view.w/4,view.w/2,view.w*3/4}) {
-                const auto expected=image[std::min(239,y*240/view.h)*256+std::min(255,x*256/view.w)];
+                const auto expected=image[std::min(int(fh)-1,y*int(fh)/view.h)*fw+std::min(int(fw)-1,x*int(fw)/view.w)];
                 const auto actual=at(view.x+x,view.y+y);
                 if (actual.r!=expected.r || actual.g!=expected.g || actual.b!=expected.b)
                     throw std::runtime_error("Vulkan texture readback mismatch");

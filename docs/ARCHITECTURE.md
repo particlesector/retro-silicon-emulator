@@ -73,6 +73,12 @@ The UI must not drive chip internals directly. Keep host callbacks and bounded
 presentation queues outside logical simulation; define backpressure explicitly.
 Version future state/trace formats and validate compatibility before loading.
 
+The common [session boundary](SESSIONS.md#application-integration-m11) is now used
+by CLI, desktop and audio-only playback. Generic production/presentation consume
+metadata and owned RGBA/PCM; default NES controls, smoke fixture inspection and
+legacy CLI formatting remain separate application adapters. Dispatch stays at
+bounded session operations; the specialized machine/chip scheduler is unchanged.
+
 ## Implementation boundaries
 The generic runtime provides the [M1 lifecycle contract](CORE_TIMING.md). The NES
 runtime owns master-clock scheduling and has verified headless execution of the
