@@ -1,12 +1,14 @@
 # Project vision
 
 Retro Silicon Emulator is an open, modular, chip-oriented emulation framework
-and desktop application. It has two equally important long-term goals:
+and desktop application. It has three complementary long-term goals:
 
 - Preserve historical computers through accurate, reusable models of CPUs,
   video/audio chips, memory, controllers, buses, and glue logic.
 - Let developers construct experimental computers from historical and new parts,
   with explicit adapters when bus, timing, electrical, or firmware contracts differ.
+- Enable machine-independent observation and control for AI learning, automated
+  software testing and hardware verification across historical and custom machines.
 
 The first usable product is an NTSC NES emulator. A working machine comes before
 a generic framework demonstration. Apple IIe is a later target for proving reuse;
@@ -121,3 +123,15 @@ portability possibility, subject to the chosen Vulkan tooling. No automatic HDL
 translation, arbitrary plug-and-play electrical compatibility, full transistor
 simulation, network play, online ROM distribution, achievements, cloud services,
 or embedded scripting is required for the initial releases.
+
+## Intelligence and automation
+
+Emulate. Create. Train. Verify. The proposed [second MVP](AI_MVP_ROADMAP.md)
+adds optional AI SDK/training and native model execution, initially for NES NROM.
+Agents observe memory, registers, events, video and audio as supported, then
+submit timestamped input at defined boundaries. The same interface serves
+traditional test tools and future workbench machines. Task rewards and models
+remain external to hardware; arbitrary application competence is a research goal,
+not a release promise. CPU simulation remains the timing authority while CUDA
+accelerates learning and inference. Support both human-visible real-time operation
+and parallel accelerated headless runs.
