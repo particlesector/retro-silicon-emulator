@@ -131,3 +131,9 @@ outside verified behavior. The RGB palette is approximate.
 PAL, other mappers, NES 2.0, battery saves, save states/rewind, debugger UI, other
 systems, GPU compute emulation, and FPGA equivalence remain deferred. This work
 adds acceptance evidence rather than expanding that scope.
+
+## Subsequent MVP
+
+The proposed [AI MVP acceptance](AI_MVP_ACCEPTANCE.md) defines separate M20
+release gates. This historical M8 record and frozen fixtures remain unchanged
+in meaning; deferred features above describe the M8 baseline, not the new plan.
