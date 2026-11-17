@@ -153,9 +153,7 @@ prove equivalence with the corresponding validated built-in definition.
 
 ## Later work: scope separately
 
-Select the next product milestone after M11 and define its fixtures, acceptance
-criteria and firmware/licensing needs before implementation. These directions
-remain visible in [Project vision](VISION.md), but are not M9-M11 requirements:
+The proposed next product milestone after M11 is the [AI-enabled MVP (M12–M20)](AI_MVP_ROADMAP.md), with [release gates](AI_MVP_ACCEPTANCE.md). M11 remains unchanged and must pass first. The following directions remain visible in [Project vision](VISION.md); scope beyond the AI MVP separately.
 
 - Broader NES compatibility: NES 2.0, additional mappers/board variants, atomic
   battery saves, regions/peripherals and compatibility-driven unofficial opcodes.
