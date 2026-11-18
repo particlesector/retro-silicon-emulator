@@ -3,8 +3,8 @@
 ## Goals
 Build an accurate NES emulator first, with a reusable component-based C++23 core suitable for future historical and experimental machines. Support deterministic headless tests and comparison with Retro Silicon FPGA traces.
 
-Historical preservation and experimental computer construction are equally
-important long-term goals. The NES is the first concrete product; Apple IIe and
+Historical preservation, experimental computer construction and AI-enabled
+observation/control are complementary long-term goals. The NES is the first concrete product; Apple IIe and
 custom machines should reuse chip models with explicit adapters and machine-owned
 wiring. See [Project vision](VISION.md) for the fuller product direction, component
 compatibility, workbench, diagnostics, and FPGA verification goals. The
@@ -139,3 +139,27 @@ Do not force all hardware models into a generic GPU kernel interface. The backen
 ## Accuracy boundaries
 
 Cycle accuracy is always relative to a **named observation boundary** (for example CPU bus cycles, PPU dots, DMA events, or chip pins). It does not imply transistor-level or analog accuracy. FPGA trace comparison requires matched initial state, clock-domain mapping, input events, and documented handling of undefined hardware behavior.
+
+## Observation, automation and AI (proposed M12–M20)
+
+Extend sessions through optional capability interfaces, not universal chip APIs.
+Machine adapters publish typed memory/register/signal metadata and non-mutating
+inspection; distinguish peeks from side-effecting bus reads. Observe at documented
+clock phases/events with stable sequence order. Disabled subscriptions should
+add negligible measured overhead. Batch/delta encode data, bound queues and
+report loss; lossless consumers block only at safe execution boundaries or fail.
+
+Session ownership remains serialized; agents submit named timestamped inputs,
+reset/step/run commands, never direct chip mutations. Full versioned snapshots
+and action replay preserve logical determinism independently of host/GPU timing.
+Parallel sessions own separate state; an optional worker pool batches observations
+and actions. Optional Python bindings/Gymnasium and PyTorch/CUDA trainer sit above
+the session boundary; task reward/termination and preprocessing are separate from
+hardware. Optional ONNX Runtime inference serves native C++ playback. Desktop
+telemetry is bounded and trainer work never runs on the UI/audio callback thread.
+Neither CUDA nor Python is required to build the core or ordinary emulator.
+
+See [AI MVP roadmap](AI_MVP_ROADMAP.md) and [acceptance](AI_MVP_ACCEPTANCE.md)
+for implementation gates. GPU learning is not GPU hardware emulation; no model
+completion time determines simulated hardware timing. Recorded actions, not
+training algorithm bitwise determinism, are the replay contract.

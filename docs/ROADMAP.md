@@ -2,7 +2,7 @@
 
 [Project vision](VISION.md) preserves the long-term direction;
 [Architecture](ARCHITECTURE.md) defines the boundaries. This roadmap records the
-completed NES MVP and the next bounded steps toward reusable machine sessions.
+completed NES MVP, reusable machine sessions and the next AI-enabled MVP.
 Milestone numbering continues from M8 so earlier references remain meaningful.
 
 ## Completed baseline: M1-M8
@@ -153,11 +153,17 @@ memory maps and boot contract. Registered C++ components still implement chip
 behavior. A future loader must reject invalid or unsupported combinations and
 prove equivalence with the corresponding validated built-in definition.
 
+## Next MVP: M12–M20
+
+M11 is complete. Begin M12 using the [AI MVP roadmap](AI_MVP_ROADMAP.md)
+and [release acceptance](AI_MVP_ACCEPTANCE.md). Preserve the M11 validation
+baseline and complete each milestone before starting the next.
+
 ## Later work: scope separately
 
-Select the next product milestone after M11 and define its fixtures, acceptance
-criteria and firmware/licensing needs before implementation. These directions
-remain visible in [Project vision](VISION.md), but are not M9-M11 requirements:
+The following directions remain visible in [Project vision](VISION.md). Only
+inspection, snapshots and replay explicitly scoped in the AI roadmap are part
+of this MVP; other items require separate acceptance gates.
 
 - Broader NES compatibility: NES 2.0, additional mappers/board variants, atomic
   battery saves, regions/peripherals and compatibility-driven unofficial opcodes.
