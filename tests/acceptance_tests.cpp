@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "acceptance_programs.hpp"
 #include <rse/systems/nes/machine.hpp>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -29,8 +30,15 @@ std::uint64_t state_hash(const Machine& machine) {
     return h.value;
 }
 Observation run(Machine& machine,bool chunked,const std::array<rse::Tick,12>* targets=nullptr,
-                std::array<rse::Tick,12>* recorded=nullptr) {
+                std::array<rse::Tick,12>* recorded=nullptr,bool observed=false) {
     Hash frames,pcm,events;std::uint64_t samples=0;
+    std::size_t observed_count=0;
+    if(observed) machine.subscribe({.capacity=150'000,.events=true,
+        .boundary=rse::session::Boundary::cpu_cycle,
+        .delta=rse::session::ValueRange{"cpu.nmi"}});
+    std::uint64_t sequence=0;
+    std::optional<std::uint64_t> nmi;
+    bool nmi_line=false;
     for(unsigned frame=0;frame<12;++frame) {
         machine.schedule_input(machine.state().tick+1,frame>=4 && frame<8 ? 1 : 0);
         if(chunked) {
@@ -43,6 +51,38 @@ Observation run(Machine& machine,bool chunked,const std::array<rse::Tick,12>* ta
         for(auto sample:machine.frame().samples)frames.add(sample);
         const auto audio=machine.take_audio();samples+=audio.size();
         for(auto sample:audio)pcm.add(static_cast<std::uint16_t>(sample));
+        if(observed) {
+            const auto batch=machine.drain();
+            const auto events=machine.trace();
+            const auto schema=machine.schema();
+            check(!batch.lost,"M12 frozen stream overflowed");
+            for(const auto& record:batch.records) {
+                check(record.sequence==++sequence,"M12 stream sequence");
+                if(record.kind==rse::session::RecordKind::delta) {
+                    check(record.id=="cpu.nmi" && record.previous==nmi && record.initial==!nmi &&
+                        record.value==std::uint64_t(nmi_line) && record.value!=nmi,"M12 NMI delta");
+                    nmi=record.value;
+                    continue;
+                }
+                check(record.kind==rse::session::RecordKind::event && observed_count<events.size(),
+                    "M12 unexpected event");
+                const auto& event=events[observed_count++];
+                if(event.kind==TraceKind::nmi) nmi_line=event.data!=0;
+                const auto& type=schema.events[static_cast<unsigned>(event.kind)];
+                check(record.tick==event.tick &&
+                    record.id==type.id && record.value==event.data &&
+                    (type.address_domain.empty() ? !record.address : record.address==event.address) &&
+                    record.index==(event.kind==TraceKind::frame ? event.data :
+                        type.clock==rse::session::ClockDomain::master ? event.tick : event.cycle),
+                    "M12 event ordering or payload differs from trace");
+            }
+            check(observed_count==events.size() && nmi.has_value(),"M12 event count or initial NMI delta");
+            if(machine.state().tick%12==0)
+                check(nmi==std::uint64_t(machine.state().nmi),"M12 final CPU sample differs from NMI state");
+            std::array<std::optional<std::uint64_t>,8> registers;
+            machine.read("cpu.bus",0x2000,registers);
+            machine.read("cpu.bus",0x4010,registers);
+        }
     }
     for(auto e:machine.trace()){events.add(e.tick);events.add(unsigned(e.kind));events.add(e.address);events.add(e.data);events.add(e.cycle);}
     check(samples==machine.state().cpu_cycles*48000ull*11/19687500,"acceptance sample count");
@@ -79,7 +119,11 @@ void verify(bool print) {
                 <<" state="<<actual.state<<" events="<<actual.events<<" frames="<<actual.frames<<" pcm="<<actual.pcm<<'\n';continue;
         }
         if(actual!=expected[index++]) throw std::runtime_error(std::string(name)+": pinned observation mismatch");
-        Machine replay(cartridge,profile);check(run(replay,true,&targets)==actual,"acceptance chunk replay mismatch");
+        Machine replay(cartridge,profile);
+        check(run(replay,true,&targets)==actual,"unobserved acceptance chunk replay mismatch");
+        replay.reset();
+        check(run(replay,true,&targets,nullptr,true)==actual,
+            "observed acceptance chunk replay mismatch");
         baseline.reset();check(run(baseline,false)==actual,"acceptance reset replay mismatch");
         if(name=="rse-av-input-v1.nes") {
             check(baseline.inspect_memory(0)==11 && baseline.inspect_memory(0x10)==0,"acceptance NMI/input result");
@@ -87,11 +131,45 @@ void verify(bool print) {
         }
     }
 }
+void benchmark_disabled() {
+    using namespace std::chrono;
+    const auto cartridge=rse::acceptance::av_input_program().cartridge();
+    constexpr unsigned frame_count=240;
+    const auto measure=[&](bool disable) {
+        Machine machine(cartridge,{.capture_audio=true});
+        if(disable) {
+            machine.subscribe({.capacity=128,.events=true,.boundary=rse::session::Boundary::cpu_cycle});
+            machine.unsubscribe();
+        }
+        const auto start=steady_clock::now();
+        for(unsigned frame=0;frame<frame_count;++frame) {
+            (void)machine.run_frame();
+            (void)machine.take_audio();
+        }
+        const auto elapsed=duration<double,std::milli>(steady_clock::now()-start).count();
+        check(machine.frame().number==frame_count && !machine.state().faulted,"benchmark workload");
+        return elapsed;
+    };
+    (void)measure(false);
+    for(unsigned pair=0;pair<7;++pair) {
+        double baseline,disabled;
+        if(pair%2) {
+            disabled=measure(true);
+            baseline=measure(false);
+        } else {
+            baseline=measure(false);
+            disabled=measure(true);
+        }
+        std::cout<<baseline<<','<<disabled<<'\n';
+    }
+}
 }
 int main(int argc,char** argv) {
     try {
         if(argc==3 && std::string_view(argv[1])=="--write-set")write_set(argv[2]);
+        else if(argc==2 && std::string_view(argv[1])=="--benchmark-disabled")benchmark_disabled();
         else if(argc==1 || (argc==2 && std::string_view(argv[1])=="--print-baseline"))verify(argc==2);
-        else throw std::invalid_argument("Usage: rse-acceptance-tests [--write-set <folder>|--print-baseline]");
+        else throw std::invalid_argument(
+            "Usage: rse-acceptance-tests [--write-set <folder>|--print-baseline|--benchmark-disabled]");
     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
 }

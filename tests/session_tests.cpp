@@ -184,6 +184,106 @@ void nes_replay(NesProgram program,rse::nes::Profile profile) {
         }
     }
 }
+void inspection_contract() {
+    using api::Boundary;
+    using api::Phase;
+    using api::ValueRange;
+    const auto image=rse::acceptance::image(rse::acceptance::av_input_program());
+    auto machine=api::create("nes-ntsc",image);
+    auto* inspect=machine->inspection();
+    check(inspect && inspect->schema().boundaries.size()==5,"NES inspection discovery");
+    check(inspect->peek("cpu.bus",0x8000)==inspect->peek("cpu.bus",0xc000),"PRG mirror");
+    check(inspect->peek("cpu.bus",0x2002)==inspect->peek("cpu.bus",0x3ffa),"PPU register mirror");
+    check(!inspect->peek("cpu.bus",0x5000),"unmapped CPU value");
+    FakeSession fake;
+    check(!fake.inspection(),"fake session should report unavailable inspection");
+    rejects<std::invalid_argument>([&]{(void)inspect->peek("unknown");});
+    rejects<std::out_of_range>([&]{(void)inspect->peek("cpu.ram",2048);});
+    std::array<std::optional<std::uint64_t>,2> output{17,18};
+    rejects<std::out_of_range>([&]{inspect->read("cpu.ram",2047,output);});
+    check(output[0]==17 && output[1]==18,"invalid bulk range changed output");
+
+    inspect->subscribe({.capacity=2,.boundary=Boundary::master_tick,.phase=Phase::before});
+    machine->advance_to(5);
+    auto batch=inspect->drain();
+    check(batch.lost==3 && batch.records.size()==2 && batch.records[0].tick==1 &&
+        batch.records[1].phase==Phase::before,"bounded master ticks");
+    rejects<std::invalid_argument>([&]{inspect->subscribe({.capacity=1,.events=true,.event_id="unknown"});});
+    machine->advance_to(6);
+    batch=inspect->drain();
+    check(batch.lost==0 && batch.records.size()==1 && batch.records[0].sequence==6 &&
+        !machine->status().faulted,"overflow sequence or invalid replacement");
+
+    const auto check_master_order=[&](bool chunked) {
+        machine->reset();
+        inspect->subscribe({.capacity=32,.events=true,.event_id="controller.input",
+            .boundary=Boundary::master_tick});
+        const std::array<std::string_view,1> pressed{"a"};
+        machine->schedule_input(4,"controller-1",pressed);
+        machine->schedule_input(4,"controller-1",{});
+        if(chunked) {
+            machine->advance_to(3);
+            machine->advance_to(4);
+        }
+        machine->advance_to(5);
+        auto batch=inspect->drain();
+        check(!batch.lost && batch.records.size()==7 && batch.records[3].value==1 &&
+            batch.records[4].value==0 && batch.records[5].tick==4 &&
+            batch.records[5].kind==api::RecordKind::boundary,"master tick and input ordering");
+        return batch.records;
+    };
+    const auto whole=check_master_order(false);
+    check(check_master_order(true)==whole,"master observations depend on advance chunking");
+
+    for(const auto phase:{Phase::before,Phase::after}) {
+        for(const auto boundary:{Boundary::cpu_cycle,Boundary::instruction,Boundary::scanline,Boundary::frame}) {
+            machine->reset();
+            check(inspect->drain().records.empty(),"reset retained observation");
+            inspect->subscribe({.capacity=1,.boundary=boundary,.phase=phase});
+            machine->run_frame();
+            batch=inspect->drain();
+            const auto instruction_tick=phase==Phase::before ? 96u : 84u;
+            const auto expected=boundary==Boundary::cpu_cycle ? 12u :
+                boundary==Boundary::instruction ? instruction_tick :
+                boundary==Boundary::scanline ? 4u : machine->status().tick;
+            check(batch.records.size()==1 && batch.records[0].tick==expected &&
+                batch.records[0].phase==phase,"missing or misplaced boundary sample");
+        }
+    }
+
+    rse::nes::Session loop(loop_program());
+    inspect=loop.inspection();
+    inspect->subscribe({.capacity=32,.events=true,.event_id="cpu.write",
+        .addresses=ValueRange{"cpu.bus",0x10},.boundary=Boundary::cpu_cycle,
+        .delta=ValueRange{"cpu.ram",0x10}});
+    loop.advance_to(180);
+    batch=inspect->drain();
+    check(batch.records.size()>=4 && batch.records.front().initial &&
+        batch.records.front().value==0 && !batch.records.front().previous,"initial delta");
+    const auto& write=batch.records[batch.records.size()-2];
+    const auto& delta=batch.records.back();
+    check(write.id=="cpu.write" && write.address==0x10 && write.value==1 &&
+        delta.id=="cpu.ram" && delta.previous==0 && delta.value==1 &&
+        delta.tick==write.tick && delta.sequence==write.sequence+1,"write and delta ordering");
+    check(inspect->peek("cpu.bus",0x1810)==1,"CPU RAM mirror");
+    inspect->unsubscribe();
+    loop.advance_to(300);
+    check(inspect->drain().records.empty(),"unsubscribe kept recording");
+
+    machine->reset();
+    machine->run_frame();
+    check((*machine->inspection()->peek("cpu.bus",0x2002)&0x80)!=0,"PPUSTATUS vblank");
+    check((*machine->inspection()->peek("cpu.bus",0x2002)&0x80)!=0,"peek cleared vblank");
+    check(machine->inspection()->peek("ppu.bus",0x3f21)==0x21 &&
+        machine->inspection()->peek("ppu.bus",0x3f10)==0x0f,
+        "palette replication");
+    loop.advance_to(400'000);
+    check((*inspect->peek("cpu.bus",0x4015)&0x40)!=0 &&
+          (*inspect->peek("apu.status")&0x40)!=0,"peek acknowledged APU IRQ");
+    const auto controller=loop.diagnostics().state().controller;
+    check(inspect->peek("cpu.bus",0x4016).has_value() &&
+        loop.diagnostics().state().controller==controller,"peek clocked controller");
+}
 void nes_contract(const std::filesystem::path& file) {
     const auto image=rse::acceptance::image(rse::acceptance::av_input_program());
     check(api::builtin_ids().size()==1 && api::builtin_ids()[0]=="nes-ntsc","built-in IDs");
@@ -251,7 +351,7 @@ void nes_contract(const std::filesystem::path& file) {
 int main(int argc,char** argv) {
     try {
         check(argc==2,"Expected fixture output path");
-        fake_contract();nes_contract(argv[1]);
+        fake_contract();nes_contract(argv[1]);inspection_contract();
         for(auto [name,program]:rse::acceptance::programs())nes_replay(std::move(program),{});
         nes_replay(rse::acceptance::av_input_program(),{.ppu_phase=3,.cpu_phase=7,.dma_get_on_odd=false});
     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}

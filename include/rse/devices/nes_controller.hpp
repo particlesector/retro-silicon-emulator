@@ -20,8 +20,9 @@ public:
         shift_.set_parallel(static_cast<std::uint8_t>(~pins));
     }
     void strobe(bool high) noexcept { shift_.set_load(high); }
+    [[nodiscard]] std::uint8_t peek() const noexcept { return shift_.output(); }
     [[nodiscard]] std::uint8_t read() noexcept {
-        const auto value = static_cast<std::uint8_t>(shift_.output());
+        const auto value = peek();
         shift_.clock();
         return value;
     }

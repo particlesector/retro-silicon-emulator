@@ -67,26 +67,36 @@ struct Rp2c02::Impl {
         if (rendering()) { increment_x(); increment_y(); }
         else r.v = (r.v + ((r.control & 4) ? 32 : 1)) & 0x7fff;
     }
+    std::uint8_t cpu_peek(std::uint16_t select) const noexcept {
+        switch (select & 7) {
+        case 2: return (r.status & 0xe0) | (io & 31);
+        case 4:
+            if (rendering()) return oam_bus;
+            return oam[r.oam_address] & ((r.oam_address & 3) == 2 ? 0xe3 : 0xff);
+        case 7:
+            if ((r.v & 0x3fff) >= 0x3f00) return (io & 0xc0) | palette_read(r.v);
+            return buffer;
+        default: return io;
+        }
+    }
     std::uint8_t cpu_read(std::uint16_t select) {
         healthy();
         try {
             switch (select & 7) {
             case 2: {
-                const auto value = static_cast<std::uint8_t>((r.status & 0xe0) | (io & 31));
+                io = cpu_peek(select);
                 if (r.scanline == 241 && r.dot <= 1) suppress_vblank = true;
                 r.status &= ~0x80;
                 r.write_toggle = false;
-                io = value;
                 break;
             }
             case 4:
-                io = rendering() ? oam_bus : oam[r.oam_address];
-                if (!rendering() && (r.oam_address & 3) == 2) io &= 0xe3;
+                io = cpu_peek(select);
                 break;
             case 7: {
                 const auto address = r.v & 0x3fff;
                 if (address >= 0x3f00) {
-                    io = (io & 0xc0) | palette_read(address);
+                    io = cpu_peek(select);
                     buffer = bus.read(address & 0x2fff, r.dots);
                 } else {
                     io = buffer;
@@ -335,6 +345,11 @@ Rp2c02::~Rp2c02() = default;
 void Rp2c02::clock() { impl_->clock(); }
 void Rp2c02::reset() { impl_ = std::make_unique<Impl>(impl_->bus); }
 std::uint8_t Rp2c02::cpu_read(std::uint16_t select) { return impl_->cpu_read(select); }
+std::uint8_t Rp2c02::cpu_peek(std::uint16_t select) const noexcept { return impl_->cpu_peek(select); }
+std::uint8_t Rp2c02::inspect_palette(std::uint16_t address) const noexcept {
+    return impl_->palette[Impl::palette_index(address)];
+}
+std::uint8_t Rp2c02::inspect_oam(std::uint8_t address) const noexcept { return impl_->oam[address]; }
 void Rp2c02::cpu_write(std::uint16_t select, std::uint8_t value) { impl_->cpu_write(select, value); }
 bool Rp2c02::nmi_asserted() const noexcept { return impl_->nmi(); }
 PpuState Rp2c02::state() const noexcept {

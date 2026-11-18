@@ -11,6 +11,7 @@ public:
     explicit Session(Cartridge cartridge,Profile profile={});
     [[nodiscard]] const session::SystemInfo& info() const noexcept override {return info_;}
     [[nodiscard]] session::Status status() const noexcept override;
+    [[nodiscard]] session::Inspection* inspection() noexcept override {return &machine_;}
     void reset() override;
     void advance_to(Tick target) override;
     void run_frame() override;

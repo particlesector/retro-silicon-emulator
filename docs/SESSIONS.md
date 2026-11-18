@@ -5,6 +5,7 @@ It is source-level code, not a plugin ABI, serialized state format or universal
 chip interface. `rse_session` has no system, SDL3 or Vulkan dependency. The
 `rse_nes_session` adapter and `rse_builtin_sessions` factory are headless libraries.
 CLI, desktop and audio-only playback use this boundary through the built-in factory.
+Adapters can also expose typed, read-only [inspection and observation](INSPECTION.md).
 
 ## Contract
 

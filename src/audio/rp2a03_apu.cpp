@@ -166,10 +166,13 @@ void Rp2a03Apu::write(std::uint8_t reg,std::uint8_t value) {
     }
 }
 std::uint8_t Rp2a03Apu::read_status() noexcept {
-    const auto value=std::uint8_t((state_.pulse[0].length?1:0)|(state_.pulse[1].length?2:0)|
+    const auto value=peek_status();
+    state_.frame_irq=false; return value;
+}
+std::uint8_t Rp2a03Apu::peek_status() const noexcept {
+    return std::uint8_t((state_.pulse[0].length?1:0)|(state_.pulse[1].length?2:0)|
         (state_.triangle.length?4:0)|(state_.noise.length?8:0)|(state_.dmc.remaining?16:0)|
         (state_.frame_irq?64:0)|(state_.dmc.irq?128:0));
-    state_.frame_irq=false; return value;
 }
 bool Rp2a03Apu::irq_asserted() const noexcept { return state_.frame_irq || state_.dmc.irq; }
 ChannelOutput Rp2a03Apu::output() const noexcept {

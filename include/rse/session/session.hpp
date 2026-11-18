@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 #include "types.hpp"
+#include "inspection.hpp"
 #include <stdexcept>
 #include <vector>
 
@@ -17,6 +18,8 @@ public:
     // Metadata (including its referenced strings/spans) lasts until destruction.
     [[nodiscard]] virtual const SystemInfo& info() const noexcept=0;
     [[nodiscard]] virtual Status status() const noexcept=0;
+    // Null when the adapter does not implement inspection.
+    [[nodiscard]] virtual Inspection* inspection() noexcept {return nullptr;}
     virtual void reset()=0;
     // Inclusive system-defined master ticks; equal target is a no-op, rewind
     // is rejected. Execution failures require reset; invalid requests do not.
