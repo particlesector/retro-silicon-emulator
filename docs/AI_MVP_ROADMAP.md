@@ -1,6 +1,6 @@
 # AI-enabled emulation MVP (M12–M20)
 
-Status: planned, not implemented. M11 is complete; M12 is the next milestone.
+M12 is complete. M13 is the next milestone.
 See [M11 validation](M11_VALIDATION.md) for the accepted session baseline.
 Target: native Ubuntu 24.04 LTS workstation, RTX 5080 (16 GB VRAM), 64 GB RAM;
 record actual CPU, driver, CUDA/PyTorch versions and build SHA during validation.
@@ -10,15 +10,17 @@ contracts. Existing Windows/Linux core and desktop support must not regress.
 ## Milestones and acceptance gates
 
 ### M12 — Observation and inspection
-- [ ] Discover typed memory domains, registers, signals and event capabilities by
+- [x] Discover typed memory domains, registers, signals and event capabilities by
   stable IDs, widths, address units and clock domains; unsupported operations explicit.
-- [ ] Non-mutating peek/bulk read (including PPU/APU/controller side effects);
+- [x] Non-mutating peek/bulk read (including PPU/APU/controller side effects);
   distinguish physical RAM, mapped addresses, mirrors and unavailable values.
-- [ ] Subscribe by address/range/event, master tick, CPU cycle, instruction,
+- [x] Subscribe by address/range/event, master tick, CPU cycle, instruction,
   scanline or frame where supported. Specify pre/post phase and stable ordering.
   Provide deltas, bounded buffers, sequence IDs and explicit loss/overflow.
-- [ ] Compare frozen M8 hashes and trace ordering with observation on/off, including
+- [x] Compare frozen M8 hashes and trace ordering with observation on/off, including
   DMA and interrupts. Benchmark disabled overhead against same-build baseline.
+
+[Inspection contract and validation](INSPECTION.md)
 
 ### M13 — Automation and external API
 - [ ] Session-owner serialized reset, run-until/step with tick budget, timestamped

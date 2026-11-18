@@ -20,10 +20,11 @@ public:
     void write(std::uint16_t address, std::uint8_t value, std::uint64_t) noexcept override {
         cpu_write(address, value);
     }
-    [[nodiscard]] std::uint8_t cpu_read(std::uint16_t address) noexcept;
+    [[nodiscard]] std::uint8_t cpu_read(std::uint16_t address) const noexcept;
     void cpu_write(std::uint16_t address, std::uint8_t value) noexcept;
     // External PPU memory wraps at 14 bits. Palette storage is chip-local.
-    [[nodiscard]] std::uint8_t ppu_read(std::uint16_t address) noexcept;
+    [[nodiscard]] std::uint8_t ppu_read(std::uint16_t address) const noexcept;
+    [[nodiscard]] std::uint8_t nametable_byte(std::uint16_t address) const noexcept { return nametables_[address]; }
     void ppu_write(std::uint16_t address, std::uint8_t value) noexcept;
 private:
     [[nodiscard]] std::size_t nametable_index(std::uint16_t address) const noexcept;

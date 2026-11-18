@@ -31,6 +31,9 @@ public:
     void reset();
     // Native chip select (low 3 bits). Accesses do not advance time.
     [[nodiscard]] std::uint8_t cpu_read(std::uint16_t select);
+    [[nodiscard]] std::uint8_t cpu_peek(std::uint16_t select) const noexcept;
+    [[nodiscard]] std::uint8_t inspect_palette(std::uint16_t address) const noexcept;
+    [[nodiscard]] std::uint8_t inspect_oam(std::uint8_t address) const noexcept;
     void cpu_write(std::uint16_t select, std::uint8_t value);
     [[nodiscard]] bool nmi_asserted() const noexcept;
     // Non-mutating diagnostics, not a serialized save-state format.

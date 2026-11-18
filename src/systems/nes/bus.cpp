@@ -5,7 +5,7 @@
 namespace rse::nes {
 Bus::Bus(Cartridge cartridge) : cartridge_(std::move(cartridge)) {}
 
-std::uint8_t Bus::cpu_read(std::uint16_t address) noexcept {
+std::uint8_t Bus::cpu_read(std::uint16_t address) const noexcept {
     if (address < 0x2000) return ram_[address & 0x07ff];
     return cartridge_.cpu_read(address);
 }
@@ -18,7 +18,7 @@ std::size_t Bus::nametable_index(std::uint16_t address) const noexcept {
     const auto physical = cartridge_.mirroring() == Mirroring::vertical ? table % 2 : table / 2;
     return physical * 0x0400 + (offset & 0x03ff);
 }
-std::uint8_t Bus::ppu_read(std::uint16_t address) noexcept {
+std::uint8_t Bus::ppu_read(std::uint16_t address) const noexcept {
     address &= 0x3fff;
     if (address < 0x2000) return cartridge_.ppu_read(address);
     if (address < 0x3f00) return nametables_[nametable_index(address)];

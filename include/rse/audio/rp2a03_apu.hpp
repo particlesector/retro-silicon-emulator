@@ -52,6 +52,7 @@ public:
     void write(std::uint8_t reg, std::uint8_t value);
     // Only $15 is readable. Bit 5 is supplied by the console's open bus.
     [[nodiscard]] std::uint8_t read_status() noexcept;
+    [[nodiscard]] std::uint8_t peek_status() const noexcept;
     [[nodiscard]] bool irq_asserted() const noexcept;
     [[nodiscard]] ChannelOutput output() const noexcept;
     [[nodiscard]] const ApuState& state() const noexcept { return state_; }

@@ -31,12 +31,16 @@ void data_ports() {
     bus.ram[0x2f00] = 0x56;
     Rp2c02 ppu(bus);
     address(ppu, 0x2000);
+    const auto prior=bus.trace.size();
+    check(ppu.cpu_peek(7)==0 && ppu.cpu_peek(7)==0 && ppu.state().v==0x2000 &&
+        bus.trace.size()==prior,"PPUDATA peek changed address, buffer or bus");
     check(ppu.cpu_read(7) == 0 && ppu.cpu_read(7) == 0x12 && ppu.cpu_read(7) == 0x34,
           "data reads must be buffered");
     check(ppu.state().v == 0x2003, "data read increment");
     memory(ppu, 0x3f10, 0xff);
     address(ppu, 0x3f00);
     ppu.cpu_write(2, 0xc0);
+    check(ppu.cpu_peek(7)==0xff && ppu.state().v==0x3f00,"palette peek changed PPUDATA");
     check(ppu.cpu_read(7) == 0xff, "palette alias/six-bit data/open-bus high bits");
     address(ppu, 0x2000);
     check(ppu.cpu_read(7) == 0x56, "palette read must refill buffer from shadow nametable");

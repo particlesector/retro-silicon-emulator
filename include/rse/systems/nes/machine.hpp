@@ -7,6 +7,7 @@
 #include <rse/systems/nes/cartridge.hpp>
 #include <rse/systems/nes/cpu.hpp>
 #include <rse/video/rp2c02.hpp>
+#include <rse/session/inspection.hpp>
 #include <cstddef>
 #include <memory>
 #include <optional>
@@ -49,7 +50,7 @@ struct MachineState {
 
 // Headless NTSC NROM machine. See docs/NES_SYSTEM.md for scheduling, reset,
 // open-bus policy, input timestamps, trace bounds, and verification boundaries.
-class Machine {
+class Machine : public session::Inspection {
 public:
     explicit Machine(Cartridge cartridge, Profile profile = {});
     ~Machine();
@@ -67,6 +68,13 @@ public:
     [[nodiscard]] const video::PpuFrame& frame() const noexcept;
     // RAM/PRG only; device ports return nullopt, with no read side effects.
     [[nodiscard]] std::optional<std::uint8_t> inspect_memory(std::uint16_t address) const noexcept;
+    [[nodiscard]] session::InspectionInfo schema() const noexcept override;
+    [[nodiscard]] std::optional<std::uint64_t> peek(std::string_view id, std::uint32_t address=0) const override;
+    void read(std::string_view id, std::uint32_t first,
+              std::span<std::optional<std::uint64_t>> output) const override;
+    void subscribe(const session::Subscription&) override;
+    void unsubscribe() noexcept override;
+    [[nodiscard]] session::ObservationBatch drain() override;
     // Diagnostic views, invalidated by advance/reset. No frozen trace-file ABI.
     [[nodiscard]] std::span<const TraceEvent> trace() const noexcept;
     [[nodiscard]] audio::ApuState apu_state() const noexcept;
