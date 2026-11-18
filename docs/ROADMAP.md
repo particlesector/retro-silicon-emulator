@@ -129,14 +129,14 @@ Acceptance criteria:
   comparison host, establish the acceptable baseline variation before changing
   pacing, then demonstrate no material response/pacing regression. Retain the
   corrected colors, aspect ratio, controls and tear-free presentation.
-- [ ] Frozen NES captures and Debug/Release checks pass. Extracted Windows/Linux
+- [x] Frozen NES captures and Debug/Release checks pass. Extracted Windows/Linux
   Release packages pass the scripted flow and ten-minute audio-continuity check.
   Record any owner-approved manual evidence and measurement limits explicitly.
 - [x] Update architecture/build/use documentation to match the implemented
   boundary. Adding another built-in adapter should not require rewriting generic
   frontend timing, video upload or audio production.
 
-Verification and remaining approval: [M11 validation](M11_VALIDATION.md).
+Verification: [M11 validation](M11_VALIDATION.md).
 
 ## Configuration approach
 

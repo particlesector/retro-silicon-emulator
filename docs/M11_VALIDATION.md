@@ -15,9 +15,7 @@ not physical controller-to-photon latency.
 
 The final packages must retain the source margin, VSync, controls, colors and
 independent producer. Test both extracted packages for ten minutes. Windows uses
-Vulkan/WASAPI; local Linux uses Xvfb/Openbox/lavapipe and dummy audio. A fresh
-native Ubuntu audible-continuity approval is still required; M8's manual approval
-does not automatically cover this changed playback path.
+Vulkan/WASAPI; local Linux uses Xvfb/Openbox/lavapipe and dummy audio. The native Ubuntu run uses X11, Vulkan and PulseAudio with an owner observing playback.
 
 ## Automated coverage
 
@@ -71,8 +69,26 @@ virtual-host timing/continuity failure is not established; short CI checks do
 not establish ten-minute Linux reliability. Queue targets have not been enlarged
 to hide the result.
 
-Native Ubuntu 24.04 ten-minute playback/audio testing remains required before
-M11 is complete. No fresh native approval has been received; the PR stays draft.
+Native Ubuntu 24.04.5 LTS (kernel 7.0.0-42-generic, GCC 13.3) verified commit
+`21cf9c6` on November 17, 2026. All 19 desktop Release CTest suites and all 18
+frontend-free Debug suites passed, including frozen fixture verification. The
+separate Vulkan readback test passed on X11. The extracted local Release ZIP
+loaded its bundled SDL3 library and used the RTX 5080 (driver 595.99.02) and
+PulseAudio.
+
+The detached run exited normally after 600,001 ms with 36,044 frames,
+599,766 simulated ms, zero starvation requests/bytes, five Vulkan readbacks,
+two loads, one reset and three expected errors. It recorded four software
+input responses (27,900–35,277 us, mean 31,286 us), a 1,728-byte source audio
+target, a 1,824-byte peak and one buffered video frame. The owner confirmed
+continuous audio and correct video through the first run. Its final counters
+were lost when the command session restarted. The owner also reported audio
+and video during the detached rerun. The separate five-second PulseAudio
+audio-only test passed with zero starvation.
+
+Local logs are `/tmp/rse-pr12-ubuntu/native-rerun.log` and
+`/tmp/rse-pr12-ubuntu/native-audio-only.log`. The tested executable's SHA-256
+is `ac3ec6c91283299449d69a7bd73dcf9c94cedcead918860243b7e73082349804`.
 
 Logs and packages on the development host are under `build/m11/`, including
 `final-windows-endurance*.log`, `comparison-*.log`, `linux-endurance-detached*.log`
