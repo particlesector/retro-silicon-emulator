@@ -78,6 +78,7 @@ jobs:
           test -f "$VK_DRIVER_FILES"
           export VK_DRIVER_FILES
           echo "Vulkan ICD: $VK_DRIVER_FILES"
+          xvfb-run -a sh cmake/RunWithWindowManager.sh timeout -k 5s 30s "$PWD/build/desktop/rse-desktop-render-tests"
           xvfb-run -a sh cmake/RunWithWindowManager.sh sh -c 'vulkaninfo --summary && exec timeout -k 5s 60s "$1" --smoke "$2" --seconds 30' sh "$app" "$PWD/build/desktop/acceptance-set/rse-av-input-v1.nes"
           xvfb-run -a sh cmake/RunWithWindowManager.sh sh -c '
             timeout --preserve-status -s INT -k 5s 6s "$1" --smoke "$2" --seconds 30 >"$3" 2>&1

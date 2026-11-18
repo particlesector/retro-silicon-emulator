@@ -2,10 +2,10 @@
 
 ## Contract and reference plan
 
-The desktop owns cartridge selection, RGB conversion, Vulkan presentation, SDL
+The desktop owns cartridge selection, Vulkan presentation, SDL
 input/audio devices, and real-time pacing. It does not modify chip clocks or
 instruction behavior. SDL3's explicitly selected `vulkan` renderer uploads the
-completed 256x240 frame; failure to obtain that backend is an error, not a silent
+session's completed RGBA frame; failure to obtain that backend is an error, not a silent
 fallback. Display output uses a documented approximate RGB palette and 4:3 aspect
 ratio with letterboxing. This is not composite-video or analog color emulation.
 
@@ -61,7 +61,8 @@ Gamepad removal releases its bits. There is no controller-2 or remapping UI.
 ## Presentation and pacing
 
 Frame color/emphasis samples are converted to an opaque RGBA texture using the
-explicit 64-color NTSC display approximation in `apps/desktop/presentation.hpp`.
+NES adapter's explicit 64-color NTSC display approximation in
+`include/rse/systems/nes/palette.hpp`.
 This replaces the original synthetic hue/luma wheel; it is still not a measured
 composite decoder. Emphasis approximately attenuates the other RGB channels.
 Letterboxing
@@ -157,12 +158,15 @@ does not establish physical gamepad compatibility or subjective audio quality.
 
 ## Validation
 
+See [M11 validation](M11_VALIDATION.md) for the session migration, comparison
+procedure, current package checks and outstanding native audio approval.
+
 The [accepted MVP baseline](MVP_ACCEPTANCE.md#accepted-baseline) records the
 Windows endurance counters, native Ubuntu manual approval, response-measurement
 limits and frozen fixtures. [Historical validation](MVP_VALIDATION_HISTORY.md)
 retains the earlier M7/M8 results and failures without redefining current pacing.
 
-The current desktop build has 18 CTest suites. `desktop-playback-tests` checks
+The current desktop build has 19 CTest suites. `desktop-playback-tests` checks
 the actual latest-frame handoff, initial all-buttons input, reset/replacement,
 headless equivalence and fault recovery. The extracted smoke driver lives in
 `apps/desktop/smoke.cpp`; its internal `SmokeHost` view exposes observations and

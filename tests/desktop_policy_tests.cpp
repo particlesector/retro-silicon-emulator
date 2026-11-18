@@ -3,11 +3,13 @@
 #include "application.hpp"
 #include "acceptance_programs.hpp"
 #include <rse/systems/nes/machine.hpp>
+#include <rse/systems/nes/palette.hpp>
 #include <fstream>
 #include <iostream>
 
 namespace {
 using namespace rse::desktop;
+inline Rgb rgb(std::uint16_t sample){return rse::nes::display_color(sample);}
 void check(bool ok,const char* message){if (!ok) throw std::runtime_error(message);}
 void policy() {
     check(utf8_path("caf\xc3\xa9.nes").u8string()==u8"caf\u00e9.nes","UTF-8 cartridge path");
@@ -15,6 +17,10 @@ void policy() {
     check(viewport(1000,480)==Viewport{180,0,640,480},"wide letterbox");
     check(viewport(480,720)==Viewport{0,180,480,360},"tall letterbox");
     check(viewport(0,0)==Viewport{},"minimized viewport");
+    check(viewport(900,600,{3,2})==Viewport{0,0,900,600},"non-NES aspect");
+    check(viewport(1000,600,{1,1})==Viewport{200,0,600,600},"square aspect");
+    check(viewport(1000,600,{~std::uint64_t{},1}).w==1000,"extreme wide aspect");
+    check(viewport(1000,600,{1,~std::uint64_t{}}).w==0,"extreme tall aspect");
     for(int w=1;w<1100;w+=7) for(int h=1;h<800;h+=11) {
         const auto v=viewport(w,h);check(v.x>=0 && v.y>=0 && v.x+v.w<=w && v.y+v.h<=h && v.w*3-v.h*4<4,"viewport bounds/ratio");
     }
