@@ -105,6 +105,7 @@ After building, run a supported mapper-0 iNES image for a bounded duration:
 ```sh
 rse-cli run example.nes --ticks 720089
 rse-cli run example.nes --frames 2
+rse-cli run example.nes --frames 2 --system nes-ntsc
 ```
 
 On Windows, the executable is in `build/<configuration>/Release` for a

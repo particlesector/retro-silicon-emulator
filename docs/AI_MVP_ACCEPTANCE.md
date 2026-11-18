@@ -2,6 +2,8 @@
 
 Proposed gates, all pending. [Roadmap](AI_MVP_ROADMAP.md) defines milestone
 requirements. [M8 acceptance](MVP_ACCEPTANCE.md) remains immutable historical evidence.
+[M11 validation](M11_VALIDATION.md) records the accepted session and native RTX
+5080 playback baseline, including the failed virtual-host endurance rerun.
 
 - [ ] All existing frozen fixtures and reference suites pass; Debug/Release,
   headless without AI dependencies, desktop on Windows/Linux, sanitizer and

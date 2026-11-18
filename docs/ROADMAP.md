@@ -2,7 +2,7 @@
 
 [Project vision](VISION.md) preserves the long-term direction;
 [Architecture](ARCHITECTURE.md) defines the boundaries. This roadmap records the
-completed NES MVP and the next bounded steps toward reusable machine sessions.
+completed NES MVP, reusable machine sessions and the next AI-enabled MVP.
 Milestone numbering continues from M8 so earlier references remain meaningful.
 
 ## Completed baseline: M1-M8
@@ -112,29 +112,31 @@ current user experience and measured playback behavior.
 
 Acceptance criteria:
 
-- [ ] CLI, desktop playback and audio-only playback use the common session and
+- [x] CLI, desktop playback and audio-only playback use the common session and
   built-in factory. Generic application code no longer constructs `nes::Machine`
   or depends on CPU/PPU state types. Keep NES-specific formatting and adapters
   outside generic execution/presentation code.
-- [ ] Replace hardcoded NES tick conversions, frame dimensions, palette handling
+- [x] Replace hardcoded NES tick conversions, frame dimensions, palette handling
   and input/media assumptions with session metadata and adapter behavior.
   Preserve the current default NES workflow and actionable cartridge errors;
   unknown system identifiers fail explicitly.
-- [ ] Preserve existing CLI commands, exit codes and documented NES JSON output
+- [x] Preserve existing CLI commands, exit codes and documented NES JSON output
   through a compatibility path; do not silently redefine the existing format.
-- [ ] Exercise generic CLI/playback and video layout with the fake system as well
+- [x] Exercise generic CLI/playback and video layout with the fake system as well
   as NES. Verify reset/replacement, unsupported capabilities, output lifetime,
   bounded queues and fault recovery without adding a public fake-system option.
-- [ ] Keep emulation/audio production independent of GUI waits. On the recorded
+- [x] Keep emulation/audio production independent of GUI waits. On the recorded
   comparison host, establish the acceptable baseline variation before changing
   pacing, then demonstrate no material response/pacing regression. Retain the
   corrected colors, aspect ratio, controls and tear-free presentation.
-- [ ] Frozen NES captures and Debug/Release checks pass. Extracted Windows/Linux
+- [x] Frozen NES captures and Debug/Release checks pass. Extracted Windows/Linux
   Release packages pass the scripted flow and ten-minute audio-continuity check.
   Record any owner-approved manual evidence and measurement limits explicitly.
-- [ ] Update architecture/build/use documentation to match the implemented
+- [x] Update architecture/build/use documentation to match the implemented
   boundary. Adding another built-in adapter should not require rewriting generic
   frontend timing, video upload or audio production.
+
+Verification: [M11 validation](M11_VALIDATION.md).
 
 ## Configuration approach
 
@@ -151,9 +153,17 @@ memory maps and boot contract. Registered C++ components still implement chip
 behavior. A future loader must reject invalid or unsupported combinations and
 prove equivalence with the corresponding validated built-in definition.
 
+## Next MVP: M12–M20
+
+M11 is complete. Begin M12 using the [AI MVP roadmap](AI_MVP_ROADMAP.md)
+and [release acceptance](AI_MVP_ACCEPTANCE.md). Preserve the M11 validation
+baseline and complete each milestone before starting the next.
+
 ## Later work: scope separately
 
-The proposed next product milestone after M11 is the [AI-enabled MVP (M12–M20)](AI_MVP_ROADMAP.md), with [release gates](AI_MVP_ACCEPTANCE.md). M11 remains unchanged and must pass first. The following directions remain visible in [Project vision](VISION.md); scope beyond the AI MVP separately.
+The following directions remain visible in [Project vision](VISION.md). Only
+inspection, snapshots and replay explicitly scoped in the AI roadmap are part
+of this MVP; other items require separate acceptance gates.
 
 - Broader NES compatibility: NES 2.0, additional mappers/board variants, atomic
   battery saves, regions/peripherals and compatibility-driven unofficial opcodes.

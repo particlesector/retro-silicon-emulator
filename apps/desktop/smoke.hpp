@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 #include <SDL3/SDL.h>
+#include <rse/session/session.hpp>
 #include <cstdint>
 #include <filesystem>
 #include <iosfwd>
@@ -10,6 +11,7 @@
 #include <string>
 
 namespace rse::desktop {
+std::optional<std::uint8_t> smoke_memory(const session::Session& machine,std::uint16_t address);
 struct SmokeMetrics {
     std::uint64_t first_us{},min_us{},max_us{},sum_us{};
     unsigned responses{};
@@ -18,13 +20,14 @@ struct SmokeMetrics {
 };
 
 // Internal smoke-test view. Frame samples are read-only and valid until the
-// application's next step. No window, gamepad or machine ownership is exposed.
+// application's next step. Pixels are decoded RGBA, absent before publication.
+// No window, gamepad or machine ownership is exposed.
 struct SmokeObservation {
     bool running{},loaded{};
     std::uint8_t buttons{};
     std::uint64_t tick{},frame_number{},samples{};
     unsigned loads{},resets{},errors{},readbacks{},starvation{};
-    std::span<const std::uint16_t> frame_samples;
+    std::span<const session::Rgba> frame_samples;
 };
 class SmokeHost {
 public:

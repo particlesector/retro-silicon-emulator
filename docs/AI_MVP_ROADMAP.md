@@ -1,6 +1,7 @@
 # AI-enabled emulation MVP (M12–M20)
 
-Status: proposed, not implemented. M11 remains the prerequisite and current work.
+Status: planned, not implemented. M11 is complete; M12 is the next milestone.
+See [M11 validation](M11_VALIDATION.md) for the accepted session baseline.
 Target: native Ubuntu 24.04 LTS workstation, RTX 5080 (16 GB VRAM), 64 GB RAM;
 record actual CPU, driver, CUDA/PyTorch versions and build SHA during validation.
 NES NTSC NROM remains the sole required real machine; a fake session proves generic

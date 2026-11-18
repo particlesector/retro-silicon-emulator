@@ -3,8 +3,8 @@
 ## Goals
 Build an accurate NES emulator first, with a reusable component-based C++23 core suitable for future historical and experimental machines. Support deterministic headless tests and comparison with Retro Silicon FPGA traces.
 
-Historical preservation and experimental computer construction are equally
-important long-term goals. The NES is the first concrete product; Apple IIe and
+Historical preservation, experimental computer construction and AI-enabled
+observation/control are complementary long-term goals. The NES is the first concrete product; Apple IIe and
 custom machines should reuse chip models with explicit adapters and machine-owned
 wiring. See [Project vision](VISION.md) for the fuller product direction, component
 compatibility, workbench, diagnostics, and FPGA verification goals. The
@@ -72,6 +72,12 @@ audio, diagnostics, and state/trace artifacts through an application boundary.
 The UI must not drive chip internals directly. Keep host callbacks and bounded
 presentation queues outside logical simulation; define backpressure explicitly.
 Version future state/trace formats and validate compatibility before loading.
+
+The common [session boundary](SESSIONS.md#application-integration-m11) is now used
+by CLI, desktop and audio-only playback. Generic production/presentation consume
+metadata and owned RGBA/PCM; default NES controls, smoke fixture inspection and
+legacy CLI formatting remain separate application adapters. Dispatch stays at
+bounded session operations; the specialized machine/chip scheduler is unchanged.
 
 ## Implementation boundaries
 The generic runtime provides the [M1 lifecycle contract](CORE_TIMING.md). The NES

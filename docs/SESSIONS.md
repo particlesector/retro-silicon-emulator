@@ -4,7 +4,7 @@ The internal C++ application boundary is [Session](../include/rse/session/sessio
 It is source-level code, not a plugin ABI, serialized state format or universal
 chip interface. `rse_session` has no system, SDL3 or Vulkan dependency. The
 `rse_nes_session` adapter and `rse_builtin_sessions` factory are headless libraries.
-CLI and desktop continue using their existing paths until M11.
+CLI, desktop and audio-only playback use this boundary through the built-in factory.
 
 ## Contract
 
@@ -86,3 +86,44 @@ The Linux Vulkan/Xvfb scripted desktop check uses dummy audio; it verifies the
 existing application flow and renderer, not audible continuity or physical input
 latency. CLI/desktop execution migration and repeated real-device endurance
 remain M11 work. Session contract tests themselves require neither SDL nor Vulkan.
+
+## Application integration (M11)
+
+The default system remains `nes-ntsc`. CLI and desktop accept an optional
+`--system nes-ntsc`; unknown IDs fail explicitly before media/device access.
+The CLI option follows the existing run/count arguments. Existing NES commands,
+exit codes and `rse.run.v1` JSON retain their meanings; `apps/cli/nes_output.hpp`
+owns chip-specific formatting. Generic execution drains discarded PCM in bounded
+steps, so long headless runs cannot overflow merely because nobody plays audio.
+
+Desktop playback takes a session and complete named input snapshots, not a NES
+machine or button mask. Omitted ports are released; invalid snapshots leave the
+previous snapshot intact. Only the latest snapshot and completed RGBA frame are
+retained. Borrowed adapter frames are converted/copied under the producer lock;
+rendering and texture upload use owned pixels after releasing it. Source sample
+rate/channels, dimensions/aspect and host request ticks come from metadata.
+Texture replacement handles changed dimensions. Systems without audio use a
+host-clock deadline rather than an empty PCM queue; systems without video do
+not need a texture. Host wakeups do not define simulated clock edges.
+Audio devices are opened only when the loaded session has audio, so a silent
+session does not require a sound device. Failed device setup preserves the
+previous session just like failed media loading.
+
+The source queue target remains one negotiated device period plus 2 ms; the
+producer requests approximately 1 ms of system ticks per step, rounded up.
+For NTSC NES this is 21,478 ticks instead of the former rounded 21,480. This
+changes host request boundaries, not hardware clock rates or executed ticks.
+The producer stays independent of GUI/VSync waits. Duration conversion uses
+floating point only to size host requests and diagnostic elapsed time; chip
+scheduling and timestamped input remain integer/deterministic.
+
+`nes_controls.hpp` contains default NES host bindings; `smoke.cpp` owns the
+fixture's NES inspection and expected colors. Generic playback/display do not
+include CPU/PPU types or palette interpretation. The diagnostic callback is
+serialized/read-only and must not retain views or reenter the producer.
+
+The test-only fake also exercises generic CLI execution, 32 kHz stereo source
+reconfiguration, 3x2 RGBA video, missing outputs, reset/replacement and recovery.
+`rse-desktop-render-tests` checks Vulkan readback with non-NES dimensions/aspect
+and texture replacement; run it on a display (or Xvfb/lavapipe), separately from
+the ordinary display-free CTest suites. No fake system is publicly registered.
