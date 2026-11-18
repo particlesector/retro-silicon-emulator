@@ -6,6 +6,8 @@ chip interface. `rse_session` has no system, SDL3 or Vulkan dependency. The
 `rse_nes_session` adapter and `rse_builtin_sessions` factory are headless libraries.
 CLI, desktop and audio-only playback use this boundary through the built-in factory.
 Adapters can also expose typed, read-only [inspection and observation](INSPECTION.md).
+The [automation controller](AUTOMATION.md) owns a session for bounded execution
+and optional Python access.
 
 ## Contract
 

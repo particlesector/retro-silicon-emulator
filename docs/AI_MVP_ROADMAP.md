@@ -1,6 +1,6 @@
 # AI-enabled emulation MVP (M12–M20)
 
-M12 is complete. M13 is the next milestone.
+M13 is complete. M14 is the next milestone.
 See [M11 validation](M11_VALIDATION.md) for the accepted session baseline.
 Target: native Ubuntu 24.04 LTS workstation, RTX 5080 (16 GB VRAM), 64 GB RAM;
 record actual CPU, driver, CUDA/PyTorch versions and build SHA during validation.
@@ -23,15 +23,17 @@ contracts. Existing Windows/Linux core and desktop support must not regress.
 [Inspection contract and validation](INSPECTION.md)
 
 ### M13 — Automation and external API
-- [ ] Session-owner serialized reset, run-until/step with tick budget, timestamped
+- [x] Session-owner serialized reset, run-until/step with tick budget, timestamped
   named input, pause and breakpoint/watchpoint control; never mutate from callbacks.
-- [ ] Optional Python bindings over native C++ session API; release GIL during
+- [x] Optional Python bindings over native C++ session API; release GIL during
   execution, define buffer ownership and safe teardown; no Python dependency in core.
-- [ ] Versioned binary observation batches, schema discovery and bounded transport.
+- [x] Versioned binary observation batches, schema discovery and bounded transport.
   Start in-process; local IPC/shared memory only when measured need warrants it.
   Lossless mode blocks at safe boundaries or fails explicitly; live preview may
   drop with counters. No public network service required.
-- [ ] Test fake and NES sessions, malformed requests, timing, reentrancy and replay.
+- [x] Test fake and NES sessions, malformed requests, timing, reentrancy and replay.
+
+[Automation contract and validation](AUTOMATION.md)
 
 ### M14 — Full state and replay
 - [ ] Versioned snapshots include clocks/phases, CPU microstate, PPU/APU, DMA,
