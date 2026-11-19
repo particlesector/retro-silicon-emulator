@@ -6,6 +6,10 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(RSE_BUILD_TESTS "Build unit tests" ON)
 option(RSE_BUILD_DESKTOP "Build SDL3 desktop frontend" OFF)
 option(RSE_BUILD_PYTHON "Build the optional in-process Python automation bridge" OFF)
+option(RSE_TRAINING_TESTS "Run optional Gymnasium and CPU training tests" OFF)
+if(RSE_TRAINING_TESTS AND (NOT RSE_BUILD_TESTS OR NOT RSE_BUILD_PYTHON))
+  message(FATAL_ERROR "RSE_TRAINING_TESTS requires RSE_BUILD_TESTS and RSE_BUILD_PYTHON")
+endif()
 if(RSE_BUILD_PYTHON)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 endif()
@@ -71,6 +75,11 @@ if(RSE_BUILD_TESTS)
   add_executable(rse-acceptance-tests tests/acceptance_tests.cpp)
   target_link_libraries(rse-acceptance-tests PRIVATE rse_nes)
   add_test(NAME acceptance-replay-tests COMMAND rse-acceptance-tests)
+  if(RSE_TRAINING_TESTS)
+    add_test(NAME training-sdk-tests COMMAND ${Python3_EXECUTABLE}
+      "${CMAKE_CURRENT_SOURCE_DIR}/tests/training_sdk_tests.py" "$<TARGET_FILE:rse_python_bridge>"
+      "${CMAKE_CURRENT_SOURCE_DIR}/bindings/python" "$<TARGET_FILE:rse-acceptance-tests>")
+  endif()
   add_test(NAME acceptance-fixture-hashes COMMAND ${CMAKE_COMMAND}
     "-DGENERATOR=$<TARGET_FILE:rse-acceptance-tests>"
     "-DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/acceptance-set"

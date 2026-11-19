@@ -50,6 +50,7 @@ public:
     void resume();
     [[nodiscard]] RunResult run(const RunRequest& request);
     [[nodiscard]] std::vector<std::int16_t> take_audio();
+    [[nodiscard]] std::vector<Rgba> frame_rgba() const;
 private:
     class Command;
     Inspection& inspection() const;

@@ -25,6 +25,8 @@ with Session(sys.argv[1], header + rom) as machine:
     assert "instruction" in machine.schema()["boundaries"]
     assert "start" in machine.schema()["input_ports"]["controller-1"]
     assert machine.peek("cpu.bus", 0x5000) is None
+    assert machine.read("cpu.bus", 0x5000, 2) == (None, None)
+    assert machine.schema()["video"] == [256, 240] and not machine.frame_rgba()
     rejects(ValueError, lambda: machine.run(-1, 100))
     rejects(RuntimeError, lambda: machine.run(200, 0))
     rejects(RuntimeError, lambda: machine.schedule_input(1, "controller-1", ["invalid"]))

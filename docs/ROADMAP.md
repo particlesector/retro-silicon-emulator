@@ -155,7 +155,8 @@ prove equivalence with the corresponding validated built-in definition.
 
 ## Next MVP: M12–M20
 
-M15 parallel headless execution is complete. M16 AI training SDK is next.
+M15 parallel headless execution is complete. M16 AI training SDK awaits
+Ubuntu and RTX 5080 CUDA validation.
 See the [AI MVP roadmap](AI_MVP_ROADMAP.md)
 and [release acceptance](AI_MVP_ACCEPTANCE.md). Preserve the M11 validation baseline.
 
