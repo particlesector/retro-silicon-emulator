@@ -71,10 +71,11 @@ the project-owned loop fixture.
 Windows MSVC 19.44 Debug and Release passed all 22 CTest suites with desktop
 and Python enabled. Snapshot tests compare canonical state bytes, trace
 ordering, frames and PCM across chunk sizes, including restores during CPU
-reset, an instruction, OAM/DMC DMA, rendering and after publication. The
-version 1 fixtures have pinned byte hashes so Linux can check compatibility
-from the same source. Ubuntu verification is pending because the WSL service
-returned `0x80072747` even for a minimal command.
+reset, an instruction, NMI entry, OAM/DMC DMA, rendering and after publication.
+The pinned version 1 fixture hashes matched on Windows and Ubuntu. Linux CI
+passed headless Debug, headless Release with Python, ASan/UBSan, and the
+packaged desktop smoke tests. Local WSL failed to start, so Linux verification
+used the [GitHub Actions run](https://github.com/particlesector/retro-silicon-emulator/actions/runs/44462148902).
 
 On the Windows development host, five alternating M13/M14 CLI pairs ran 300
 frames of the frozen AV fixture with identical JSON. Median elapsed times

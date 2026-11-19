@@ -1,6 +1,6 @@
 # AI-enabled emulation MVP (M12–M20)
 
-M13 is complete. M14 is implemented and awaiting Linux validation.
+M14 is complete. M15 is the next milestone.
 See [M11 validation](M11_VALIDATION.md) for the accepted session baseline.
 Target: native Ubuntu 24.04 LTS workstation, RTX 5080 (16 GB VRAM), 64 GB RAM;
 record actual CPU, driver, CUDA/PyTorch versions and build SHA during validation.
@@ -36,14 +36,14 @@ contracts. Existing Windows/Linux core and desktop support must not regress.
 [Automation contract and validation](AUTOMATION.md)
 
 ### M14 — Full state and replay
-- [ ] Versioned snapshots include clocks/phases, CPU microstate, PPU/APU, DMA,
+- [x] Versioned snapshots include clocks/phases, CPU microstate, PPU/APU, DMA,
   bus latches, RAM, cartridge/mapper, controller, pending events, RNG if present,
   deterministic PCM/resampler state and input timeline; exclude host resources.
-- [ ] Validate ROM/config hashes, versions, bounds and integrity before transactional
+- [x] Validate ROM/config hashes, versions, bounds and integrity before transactional
   restore. Clear/reprime host queues; define output cursor semantics.
-- [ ] Restore mid-instruction/DMA/frame, replay across chunk sizes and compare
+- [x] Restore mid-instruction/DMA/frame, replay across chunk sizes and compare
   canonical logical state, events, video and PCM; test corrupted/incompatible files.
-- [ ] Record portable timestamped input/action logs and reproducible failure cases.
+- [x] Record portable timestamped input/action logs and reproducible failure cases.
 
 [Snapshot and replay contract and validation](STATE_REPLAY.md)
 
