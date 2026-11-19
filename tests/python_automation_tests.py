@@ -40,8 +40,14 @@ with Session(sys.argv[1], header + rom) as machine:
     assert not decode_observations(data)[0]
     assert decode_observations(data)[1][-1][5:8] == ("cpu.write", 0x10, 0)
     rejects(ValueError, lambda: decode_observations(data[:-1]))
+    snapshot = machine.snapshot()
     machine.run(3000, 3000)
     assert machine.take_audio()
+    rejects(RuntimeError, lambda: machine.restore(snapshot[:-1]))
+    assert machine.status()[0] == 3000
+    machine.restore(snapshot)
+    assert machine.status()[0] == 132 and machine.snapshot() == snapshot
+    assert not machine.take_audio()
     machine.reset()
     assert machine.status() == (0, 0, False)
 assert decode_observations(data)[1]

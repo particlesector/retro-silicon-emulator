@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
+#include <rse/core/state_codec.hpp>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -24,6 +25,9 @@ public:
     [[nodiscard]] std::uint8_t cpu_read(std::uint16_t address) const noexcept;
     [[nodiscard]] std::uint8_t ppu_read(std::uint16_t address) const noexcept;
     void ppu_write(std::uint16_t address, std::uint8_t value) noexcept;
+    [[nodiscard]] std::uint64_t identity() const;
+    void save_state(rse::state::Writer& out) const {if(chr_ram_) out(chr_);}
+    void load_state(rse::state::Reader& in) {if(chr_ram_) in(chr_);}
 private:
     Cartridge() = default;
     std::vector<std::uint8_t> prg_;

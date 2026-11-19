@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 #include <rse/cpu/bus.hpp>
+#include <rse/core/state_codec.hpp>
 #include <memory>
 #include <stdexcept>
 
@@ -43,6 +44,8 @@ public:
     [[nodiscard]] CpuState state() const noexcept;
     [[nodiscard]] std::uint64_t cycles() const noexcept;
     [[nodiscard]] bool at_instruction_boundary() const noexcept;
+    void save_state(rse::state::Writer&) const;
+    void load_state(rse::state::Reader&);
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;

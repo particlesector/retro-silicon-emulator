@@ -13,6 +13,8 @@ public:
     [[nodiscard]] session::Status status() const noexcept override;
     [[nodiscard]] session::Inspection* inspection() noexcept override {return &machine_;}
     void reset() override;
+    [[nodiscard]] std::vector<std::uint8_t> snapshot() const override {return machine_.snapshot();}
+    void restore(std::span<const std::uint8_t> bytes) override {machine_.restore(bytes);}
     void advance_to(Tick target) override;
     void run_frame() override;
     void schedule_input(Tick tick,std::string_view port,std::span<const std::string_view> pressed) override;

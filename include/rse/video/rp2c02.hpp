@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
 #include <rse/video/ppu_bus.hpp>
+#include <rse/core/state_codec.hpp>
 #include <array>
 #include <memory>
 
@@ -40,6 +41,8 @@ public:
     [[nodiscard]] PpuState state() const noexcept;
     // Completed frame, valid until next publication/reset. Initial frame is zero.
     [[nodiscard]] const PpuFrame& frame() const noexcept;
+    void save_state(rse::state::Writer&) const;
+    void load_state(rse::state::Reader&);
 private:
     struct Impl;
     std::unique_ptr<Impl> impl_;

@@ -28,9 +28,17 @@ public:
     void accept_oam(std::uint8_t value) { oam_.accept(value); }
     [[nodiscard]] OamDmaState oam_state() const noexcept { return oam_.state(); }
     [[nodiscard]] bool dmc_active() const noexcept { return stage_!=0; }
+    void save_state(rse::state::Writer& out) const {oam_.save_state(out);out(stage_,held_,source_);}
+    void load_state(rse::state::Reader& in) {
+        Rp2a03Dma next;
+        next.oam_.load_state(in);
+        in(next.stage_,next.held_,next.source_);
+        rse::state::require(next.stage_<=2 && (!next.stage_ || next.source_>=0x8000));
+        *this=next;
+    }
 private:
     Rp2a03OamDma oam_;
-    unsigned stage_{};
+    std::uint8_t stage_{};
     std::uint16_t held_{},source_{};
 };
 } // namespace rse::devices

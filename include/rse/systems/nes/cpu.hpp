@@ -19,6 +19,8 @@ public:
     [[nodiscard]] CpuState state() const noexcept { return core_.state(); }
     [[nodiscard]] std::uint64_t cycles() const noexcept { return core_.cycles(); }
     [[nodiscard]] bool at_instruction_boundary() const noexcept { return core_.at_instruction_boundary(); }
+    void save_state(rse::state::Writer& out) const {core_.save_state(out);}
+    void load_state(rse::state::Reader& in) {core_.load_state(in);}
 private:
     cpu::Mos6502 core_;
 };

@@ -116,6 +116,14 @@ void Automation::read(std::string_view id,std::uint32_t first,std::span<std::opt
     inspection().read(id,first,output);
 }
 void Automation::reset() {const Command command(*this); session_->reset();}
+std::vector<std::uint8_t> Automation::snapshot() const {
+    const Command command(*this);
+    return session_->snapshot();
+}
+void Automation::restore(std::span<const std::uint8_t> bytes) {
+    const Command command(*this);
+    session_->restore(bytes);
+}
 void Automation::schedule_input(Tick tick,std::string_view port,std::span<const std::string_view> pressed) {
     const Command command(*this);
     session_->schedule_input(tick,port,pressed);

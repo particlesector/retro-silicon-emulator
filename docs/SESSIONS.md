@@ -8,6 +8,7 @@ CLI, desktop and audio-only playback use this boundary through the built-in fact
 Adapters can also expose typed, read-only [inspection and observation](INSPECTION.md).
 The [automation controller](AUTOMATION.md) owns a session for bounded execution
 and optional Python access.
+The NES adapter supports [portable snapshots and replay logs](STATE_REPLAY.md).
 
 ## Contract
 

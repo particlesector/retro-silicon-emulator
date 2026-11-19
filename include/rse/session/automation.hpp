@@ -43,6 +43,8 @@ public:
     [[nodiscard]] std::optional<std::uint64_t> peek(std::string_view id, std::uint32_t address=0) const;
     void read(std::string_view id,std::uint32_t first,std::span<std::optional<std::uint64_t>> output) const;
     void reset();
+    [[nodiscard]] std::vector<std::uint8_t> snapshot() const;
+    void restore(std::span<const std::uint8_t>);
     void schedule_input(Tick tick, std::string_view port, std::span<const std::string_view> pressed);
     void pause() noexcept;
     void resume();

@@ -156,8 +156,8 @@ prove equivalence with the corresponding validated built-in definition.
 ## Next MVP: M12–M20
 
 M13 automation and external API are complete. M14 full state and replay are
-next in the [AI MVP roadmap](AI_MVP_ROADMAP.md). Preserve the M11 validation
-baseline and use [release acceptance](AI_MVP_ACCEPTANCE.md) for the final AI MVP.
+implemented with Linux validation pending. See the [AI MVP roadmap](AI_MVP_ROADMAP.md)
+and [release acceptance](AI_MVP_ACCEPTANCE.md). Preserve the M11 validation baseline.
 
 ## Later work: scope separately
 
