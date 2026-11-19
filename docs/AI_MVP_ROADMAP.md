@@ -1,6 +1,6 @@
 # AI-enabled emulation MVP (M12–M20)
 
-M14 is complete. M15 is the next milestone.
+M15 is complete. M16 is the next milestone.
 See [M11 validation](M11_VALIDATION.md) for the accepted session baseline.
 Target: native Ubuntu 24.04 LTS workstation, RTX 5080 (16 GB VRAM), 64 GB RAM;
 record actual CPU, driver, CUDA/PyTorch versions and build SHA during validation.
@@ -48,13 +48,15 @@ contracts. Existing Windows/Linux core and desktop support must not regress.
 [Snapshot and replay contract and validation](STATE_REPLAY.md)
 
 ### M15 — Parallel headless execution
-- [ ] Independent sessions, no shared mutable machine state, bounded worker pool,
+- [x] Independent sessions, no shared mutable machine state, bounded worker pool,
   deterministic per-environment seed/reset and batched observations/actions.
-- [ ] Headless accelerated execution without wall-clock pacing or display/audio
+- [x] Headless accelerated execution without wall-clock pacing or display/audio
   devices; suppress only host output, never required emulated hardware work.
-- [ ] Benchmark 1/2/4/8/16/32 environments where feasible: frames/ticks/steps per
+- [x] Benchmark 1/2/4/8/16/32 environments where feasible: frames/ticks/steps per
   second, CPU/RAM, observation bandwidth and GPU utilization once connected.
   Compare hashes with serial execution; select concurrency from measured throughput.
+
+[Parallel headless contract and benchmark](PARALLEL_HEADLESS.md)
 
 ### M16 — AI training SDK
 - [ ] Optional Gymnasium adapter with reset(seed, options), step(action),
