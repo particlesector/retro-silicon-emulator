@@ -74,16 +74,18 @@ contracts. Existing Windows/Linux core and desktop support must not regress.
 [Training SDK, validation and CUDA smoke procedure](TRAINING_SDK.md)
 
 ### M17 — Autonomous gameplay and testing
-- [ ] Build project-owned licensed NROM learning fixture with movement, obstacles,
+- [x] Build project-owned licensed NROM learning fixture with movement, obstacles,
   rewards and an unambiguous finish. Keep frozen M8 fixtures unchanged.
-- [ ] Before training, pin evaluation protocol, episode budget, held-out starts
-  and threshold (proposed >=80% completion over 100 evaluation episodes and
-  improvement over random baseline). Record seeds, model hash, reward and results.
+- [x] Pin evaluation protocol, episode budget, held-out starts, seeds and
+  threshold before training (at least 80/100 and improvement over random).
 - [ ] Train/evaluate on RTX 5080; compare observation modes and report failures.
+  Record model hashes, rewards and results.
   Optional user-supplied compatible commercial ROM experiment; no redistribution.
-- [ ] Demonstrate automated testing via coverage/novel-state exploration or
+- [x] Demonstrate automated testing via coverage/novel-state exploration or
   assertions on an intentionally defective test build; capture and replay a
   real reproducible failure. AI is not an accuracy oracle.
+
+[Signal Run protocol and validation](AUTONOMOUS_GAMEPLAY.md)
 
 ### M18 — Native model playback
 - [ ] Export supported policy to ONNX; version/hash model plus preprocessing,

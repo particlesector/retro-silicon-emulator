@@ -64,6 +64,14 @@ if(RSE_BUILD_TESTS)
   add_executable(rse-snapshot-tests tests/snapshot_tests.cpp)
   target_link_libraries(rse-snapshot-tests PRIVATE rse_nes)
   add_test(NAME snapshot-tests COMMAND rse-snapshot-tests)
+  add_executable(rse-gameplay-tests tests/gameplay_tests.cpp)
+  target_link_libraries(rse-gameplay-tests PRIVATE rse_nes)
+  add_test(NAME gameplay-tests COMMAND rse-gameplay-tests)
+  if(RSE_TRAINING_TESTS)
+    add_test(NAME gameplay-sdk-tests COMMAND ${Python3_EXECUTABLE}
+      "${CMAKE_CURRENT_SOURCE_DIR}/tests/gameplay_sdk_tests.py" "$<TARGET_FILE:rse_python_bridge>"
+      "${CMAKE_CURRENT_SOURCE_DIR}/bindings/python" "$<TARGET_FILE:rse-gameplay-tests>")
+  endif()
   if(RSE_BUILD_PYTHON)
     add_test(NAME python-automation-tests COMMAND ${Python3_EXECUTABLE}
       "${CMAKE_CURRENT_SOURCE_DIR}/tests/python_automation_tests.py"

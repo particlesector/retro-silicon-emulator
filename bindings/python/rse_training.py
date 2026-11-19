@@ -224,6 +224,10 @@ class EmulatorEnv(gym.Env):
     def render(self):
         return self._rgb() if self.render_mode == "rgb_array" else None
 
+    def inspect(self, identifier, first, count):
+        """Read task diagnostics independently of policy observations."""
+        return self._session.read(identifier, first, count)
+
     def close(self):
         self._ended = True
         self._session.close()
