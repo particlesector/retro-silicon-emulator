@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
+#include <rse/core/state_codec.hpp>
 #include <array>
 #include <cstdint>
 #include <optional>
@@ -60,7 +61,11 @@ public:
     // pending until accept_dma(); cancel before halting when it disappears.
     [[nodiscard]] std::optional<std::uint16_t> dma_request() const noexcept;
     void accept_dma(std::uint8_t data);
+    void save_state(rse::state::Writer&) const;
+    void load_state(rse::state::Reader&);
 private:
+    template<class Archive,class Self>
+    static void fields(Archive&,Self&);
     ApuState state_;
     bool get_{}, pending_five_{};
     std::uint8_t reset_delay_{};

@@ -13,6 +13,40 @@
 namespace rse::nes {
 namespace {
 using namespace session;
+constexpr std::uint32_t snapshot_magic=0x53534552; // RESS
+constexpr std::uint32_t replay_magic=0x4c534552;   // RESL
+constexpr std::uint16_t format_version=1;
+constexpr std::uint32_t event_limit=1'000'000;
+constexpr std::size_t file_limit=12'000'000;
+
+std::uint64_t config_identity(const Profile& profile) {
+    rse::state::Writer config;
+    config(profile.ppu_phase,profile.cpu_phase,profile.dma_get_on_odd,profile.capture_audio);
+    return rse::state::hash(config.bytes);
+}
+std::vector<std::uint8_t> envelope(std::uint32_t magic,std::uint64_t rom,const Profile& profile,
+    const rse::state::Writer& payload) {
+    rse::state::require(payload.bytes.size()<=file_limit);
+    rse::state::Writer out;
+    out(magic,format_version,std::uint16_t{0},rom,config_identity(profile),
+        static_cast<std::uint32_t>(payload.bytes.size()),rse::state::hash(payload.bytes));
+    out.bytes.insert(out.bytes.end(),payload.bytes.begin(),payload.bytes.end());
+    return std::move(out.bytes);
+}
+rse::state::Reader payload(std::span<const std::uint8_t> bytes,std::uint32_t expected_magic,
+    std::uint64_t expected_rom,const Profile& profile) {
+    using rse::state::require;
+    rse::state::Reader header(bytes);
+    std::uint32_t magic,size;
+    std::uint16_t version,reserved;
+    std::uint64_t rom,config,hash;
+    header(magic,version,reserved,rom,config,size,hash);
+    require(magic==expected_magic && version==format_version && !reserved && rom==expected_rom &&
+        config==config_identity(profile) && size<=file_limit && size==header.remaining());
+    bytes=bytes.last(size);
+    require(hash==rse::state::hash(bytes));
+    return rse::state::Reader(bytes);
+}
 using enum ClockDomain;
 using enum ValueKind;
 using enum AddressSpace;
@@ -146,7 +180,7 @@ struct Machine::Impl {
             system.record(TraceKind::ppu_write,address,value,dot);
         }
     };
-    enum class ScheduledKind { input, irq };
+    enum class ScheduledKind : std::uint8_t { input=0, irq=1 };
     struct Scheduled { Tick tick; ScheduledKind kind; std::uint8_t data; };
     Profile profile;
     Bus memory;
@@ -372,10 +406,64 @@ struct Machine::Impl {
         return ppu.frame();
     }
     bool sampling() const noexcept {return stream && stream->options.boundary.has_value();}
+    void save(rse::state::Writer& out) const {
+        healthy();
+        const auto pending=std::span(scheduled).subspan(next_event);
+        rse::state::require(pending.size()<=event_limit);
+        out(tick,next_ppu,next_cpu,latch,irq,nmi,apu_irq);
+        cpu.save_state(out);
+        ppu.save_state(out);
+        memory.save_state(out);
+        controller.save_state(out);
+        dma.save_state(out);
+        apu.save_state(out);
+        pcm.save_state(out);
+        out(static_cast<std::uint32_t>(pending.size()));
+        for(const auto& event:pending)
+            out(event.tick,static_cast<std::uint8_t>(event.kind),event.data);
+    }
+    void load(rse::state::Reader& in) {
+        using rse::state::require;
+        in(tick,next_ppu,next_cpu,latch,irq,nmi,apu_irq);
+        active_tick=tick;
+        cpu.load_state(in);
+        ppu.load_state(in);
+        memory.load_state(in);
+        controller.load_state(in);
+        dma.load_state(in);
+        apu.load_state(in);
+        pcm.load_state(in);
+        const auto check_clock=[&](std::optional<Tick> edge,Tick period,Tick phase,Tick cycles) {
+            const auto first=phase ? phase : period;
+            const auto elapsed=tick<first ? 0 : (tick-first)/period+1;
+            const auto offset=tick<first ? first-tick : period-(tick-first)%period;
+            require(cycles==elapsed);
+            if(offset>std::numeric_limits<Tick>::max()-tick) require(!edge);
+            else require(edge==tick+offset);
+        };
+        check_clock(next_ppu,4,profile.ppu_phase,ppu.state().dots);
+        check_clock(next_cpu,12,profile.cpu_phase,cpu.cycles());
+        require(apu.state().cycles==cpu.cycles() && nmi==ppu.nmi_asserted() &&
+            apu_irq==apu.irq_asserted());
+        std::uint32_t count;
+        in(count);
+        require(count<=event_limit && in.remaining()==std::size_t(count)*10);
+        scheduled.reserve(count);
+        Tick previous=tick;
+        for(std::uint32_t i=0;i<count;++i) {
+            Tick when;
+            std::uint8_t kind,data;
+            in(when,kind,data);
+            require(when>tick && when>=previous && kind<=1 && (!kind || data<=1));
+            scheduled.push_back({when,static_cast<ScheduledKind>(kind),data});
+            previous=when;
+        }
+    }
 };
 
 Machine::Machine(Cartridge cartridge, Profile profile)
-    : initial_(std::move(cartridge)), profile_(profile), impl_(std::make_unique<Impl>(initial_,profile)) {}
+    : initial_(std::move(cartridge)), rom_identity_(initial_.identity()), profile_(profile),
+      impl_(std::make_unique<Impl>(initial_,profile)) {}
 Machine::~Machine() = default;
 void Machine::advance_to(Tick target) {
     if (impl_->sampling()) impl_->advance_to<true>(target);
@@ -386,6 +474,51 @@ const video::PpuFrame& Machine::run_frame() {
     return impl_->run_frame<false>();
 }
 void Machine::reset() { impl_=std::make_unique<Impl>(initial_,profile_); }
+std::vector<std::uint8_t> Machine::snapshot() const {
+    rse::state::Writer out;
+    out.bytes.reserve(256*1024);
+    impl_->save(out);
+    return envelope(snapshot_magic,rom_identity_,profile_,out);
+}
+void Machine::restore(std::span<const std::uint8_t> bytes) {
+    auto in=payload(bytes,snapshot_magic,rom_identity_,profile_);
+    auto restored=std::make_unique<Impl>(initial_,profile_);
+    restored->load(in);
+    impl_.swap(restored);
+}
+std::vector<std::uint8_t> Machine::encode_replay(Tick target,std::span<const ReplayAction> actions) const {
+    rse::state::require(actions.size()<=event_limit);
+    Tick previous=0;
+    rse::state::Writer out;
+    out(target,static_cast<std::uint32_t>(actions.size()));
+    for(const auto& action:actions) {
+        const auto kind=static_cast<std::uint8_t>(action.kind);
+        rse::state::require(action.tick && action.tick>=previous && action.tick<=target &&
+            kind<=1 && (!kind || action.value<=1));
+        out(action.tick,kind,action.value);
+        previous=action.tick;
+    }
+    return envelope(replay_magic,rom_identity_,profile_,out);
+}
+Tick Machine::load_replay(std::span<const std::uint8_t> bytes) {
+    auto in=payload(bytes,replay_magic,rom_identity_,profile_);
+    Tick target,previous=0;
+    std::uint32_t count;
+    in(target,count);
+    rse::state::require(count<=event_limit && in.remaining()==std::size_t(count)*10);
+    auto restored=std::make_unique<Impl>(initial_,profile_);
+    restored->scheduled.reserve(count);
+    for(std::uint32_t i=0;i<count;++i) {
+        Tick when;
+        std::uint8_t kind,data;
+        in(when,kind,data);
+        rse::state::require(when && when>=previous && when<=target && kind<=1 && (!kind || data<=1));
+        restored->scheduled.push_back({when,static_cast<Impl::ScheduledKind>(kind),data});
+        previous=when;
+    }
+    impl_.swap(restored);
+    return target;
+}
 void Machine::schedule_input(Tick tick,std::uint8_t buttons) { impl_->schedule(tick,Impl::ScheduledKind::input,buttons); }
 void Machine::schedule_irq(Tick tick,bool asserted) { impl_->schedule(tick,Impl::ScheduledKind::irq,asserted); }
 MachineState Machine::state() const noexcept {

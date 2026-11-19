@@ -51,6 +51,9 @@ if(RSE_BUILD_TESTS)
   add_executable(rse-automation-tests tests/automation_tests.cpp)
   target_link_libraries(rse-automation-tests PRIVATE rse_automation rse_builtin_sessions)
   add_test(NAME automation-tests COMMAND rse-automation-tests)
+  add_executable(rse-snapshot-tests tests/snapshot_tests.cpp)
+  target_link_libraries(rse-snapshot-tests PRIVATE rse_nes)
+  add_test(NAME snapshot-tests COMMAND rse-snapshot-tests)
   if(RSE_BUILD_PYTHON)
     add_test(NAME python-automation-tests COMMAND ${Python3_EXECUTABLE}
       "${CMAKE_CURRENT_SOURCE_DIR}/tests/python_automation_tests.py"

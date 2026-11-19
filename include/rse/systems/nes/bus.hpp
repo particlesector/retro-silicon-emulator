@@ -25,6 +25,8 @@ public:
     // External PPU memory wraps at 14 bits. Palette storage is chip-local.
     [[nodiscard]] std::uint8_t ppu_read(std::uint16_t address) const noexcept;
     [[nodiscard]] std::uint8_t nametable_byte(std::uint16_t address) const noexcept { return nametables_[address]; }
+    void save_state(rse::state::Writer& out) const {out(ram_,nametables_);cartridge_.save_state(out);}
+    void load_state(rse::state::Reader& in) {in(ram_,nametables_);cartridge_.load_state(in);}
     void ppu_write(std::uint16_t address, std::uint8_t value) noexcept;
 private:
     [[nodiscard]] std::size_t nametable_index(std::uint16_t address) const noexcept;

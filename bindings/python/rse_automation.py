@@ -49,6 +49,8 @@ class _Bridge:
             "destroy": (None, (_ptr,)),
             "status": (_int, (_ptr, p(_u64), p(_u64), p(_int))),
             "reset": (_int, (_ptr,)),
+            "save": (_int, (_ptr, p(_ptr))),
+            "restore": (_int, (_ptr, _ptr, _size)),
             "pause": (None, (_ptr,)),
             "resume": (_int, (_ptr,)),
             "input": (_int, (_ptr, _u64, _str, p(_str), _size)),
@@ -122,6 +124,17 @@ class Session:
     def reset(self):
         native = self._handle()
         native.bridge.call("reset", native.pointer)
+
+    def snapshot(self):
+        native = self._handle()
+        buffer = _ptr()
+        native.bridge.call("save", native.pointer, c.byref(buffer))
+        return native.bridge.copy(buffer)
+
+    def restore(self, snapshot):
+        native = self._handle()
+        snapshot = bytes(snapshot)
+        native.bridge.call("restore", native.pointer, c.cast(_str(snapshot), _ptr), len(snapshot))
 
     def pause(self):
         native = self._handle()

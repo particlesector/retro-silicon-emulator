@@ -5,6 +5,13 @@
 #include <stdexcept>
 
 namespace rse::nes {
+std::uint64_t Cartridge::identity() const {
+    rse::state::Writer image;
+    image(static_cast<std::uint32_t>(prg_.size()),mirroring_==Mirroring::vertical,chr_ram_);
+    image.bytes.insert(image.bytes.end(),prg_.begin(),prg_.end());
+    if(!chr_ram_) image(chr_);
+    return rse::state::hash(image.bytes);
+}
 namespace {
 constexpr std::size_t header_size = 16;
 constexpr std::size_t prg_bank_size = 16384;

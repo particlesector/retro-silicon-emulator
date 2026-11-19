@@ -3,6 +3,40 @@
 #include <stdexcept>
 
 namespace rse::audio {
+template<class Archive,class Self>
+void Rp2a03Apu::fields(Archive& archive,Self& self) {
+    const auto envelope=[&](auto& e){archive(e.control,e.divider,e.decay,e.start);};
+    auto& s=self.state_;
+    for(auto& p:s.pulse) {
+        envelope(p.envelope);
+        archive(p.period,p.timer,p.length,p.phase,p.sweep,p.sweep_divider,p.enabled,p.sweep_reload);
+    }
+    auto& t=s.triangle;
+    archive(t.period,t.timer,t.control,t.length,t.linear,t.phase,t.enabled,t.reload);
+    auto& n=s.noise;
+    envelope(n.envelope);
+    archive(n.timer,n.shift,n.period,n.length,n.enabled,n.mode);
+    auto& d=s.dmc;
+    archive(d.timer,d.address,d.remaining,d.control,d.address_load,d.length_load,d.output,
+        d.buffer,d.shift,d.bits,d.buffer_full,d.silence,d.irq);
+    archive(s.cycles,s.quarters,s.halves,s.frame_cycle,s.five_step,s.inhibit,s.frame_irq,
+        self.get_,self.pending_five_,self.reset_delay_,self.request_at_,self.request_reload_);
+}
+void Rp2a03Apu::save_state(rse::state::Writer& out) const {fields(out,*this);}
+void Rp2a03Apu::load_state(rse::state::Reader& in) {
+    Rp2a03Apu next;
+    fields(in,next);
+    const auto& s=next.state_;
+    using rse::state::require;
+    for(const auto& p:s.pulse)
+        require(p.period<=0x7ff && p.timer<=0x7ff && p.phase<8 && p.sweep_divider<8 &&
+            p.envelope.decay<16 && p.envelope.divider<16);
+    require(s.triangle.period<=0x7ff && s.triangle.timer<=0x7ff && s.triangle.phase<32 &&
+        s.noise.period<16 && s.noise.shift<0x8000 && s.noise.envelope.decay<16 &&
+        s.noise.envelope.divider<16 && s.dmc.address>=0x8000 && s.dmc.output<128 &&
+        s.dmc.bits>=1 && s.dmc.bits<=8 && next.reset_delay_<=4);
+    *this=next;
+}
 namespace {
 constexpr std::array<std::uint8_t,32> lengths{
     10,254,20,2,40,4,80,6,160,8,60,10,14,12,26,14,

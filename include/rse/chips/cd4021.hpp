@@ -28,6 +28,7 @@ public:
     }
     [[nodiscard]] bool output() const noexcept { return (state_.shift & 0x80) != 0; }
     [[nodiscard]] Cd4021State state() const noexcept { return state_; }
+    void restore(Cd4021State state) noexcept {state_=state;}
 private:
     Cd4021State state_;
 };

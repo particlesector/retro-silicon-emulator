@@ -62,6 +62,16 @@ int rse_py_status(Automation* owner,std::uint64_t* tick,std::uint64_t* frames,in
     });
 }
 int rse_py_reset(Automation* owner) noexcept {return invoke([&]{owner->reset();});}
+int rse_py_save(Automation* owner,Buffer** output) noexcept {
+    return invoke([&]{
+        const auto snapshot=owner->snapshot();
+        const auto data=std::as_bytes(std::span(snapshot));
+        *output=new Buffer{{data.begin(),data.end()}};
+    });
+}
+int rse_py_restore(Automation* owner,const std::uint8_t* data,std::size_t size) noexcept {
+    return invoke([&]{owner->restore({data,size});});
+}
 void rse_py_pause(Automation* owner) noexcept {owner->pause();}
 int rse_py_resume(Automation* owner) noexcept {return invoke([&]{owner->resume();});}
 int rse_py_input(Automation* owner,std::uint64_t tick,const char* port,

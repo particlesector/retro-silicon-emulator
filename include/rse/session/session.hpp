@@ -20,6 +20,13 @@ public:
     [[nodiscard]] virtual Status status() const noexcept=0;
     // Null when the adapter does not implement inspection.
     [[nodiscard]] virtual Inspection* inspection() noexcept {return nullptr;}
+    // Portable machine state. Restore commits only after validation.
+    [[nodiscard]] virtual std::vector<std::uint8_t> snapshot() const {
+        throw UnsupportedOperation("Snapshots are unavailable");
+    }
+    virtual void restore(std::span<const std::uint8_t>) {
+        throw UnsupportedOperation("Snapshots are unavailable");
+    }
     virtual void reset()=0;
     // Inclusive system-defined master ticks; equal target is a no-op, rewind
     // is rejected. Execution failures require reset; invalid requests do not.

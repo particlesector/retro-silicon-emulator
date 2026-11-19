@@ -119,6 +119,12 @@ struct Mos6502::Impl {
     std::uint8_t value{};
     bool writing{};
     Task task;
+    struct Resume { std::uint8_t value{}; bool irq{}, nmi_pending{}; };
+    CpuState task_start{};
+    Interrupt task_interrupt{};
+    bool task_reset{};
+    std::array<Resume,8> resumes{};
+    std::uint8_t resume_count{};
 
     Impl(Bus& connection, CpuState initial, bool reset, Variant model)
         : bus(connection), variant(model), r(initial), reset_pending(reset) {
@@ -415,6 +421,7 @@ struct Mos6502::Impl {
             if (cycle == std::numeric_limits<std::uint64_t>::max())
                 throw std::overflow_error("CPU cycle counter exhausted");
             if (!task.handle || task.handle.done()) {
+                task_start=r; task_interrupt=pending; task_reset=reset_pending; resume_count=0;
                 task = execute();
                 task.handle.resume();
             }
@@ -431,12 +438,64 @@ struct Mos6502::Impl {
             ++cycle;
             if (nmi && !last_nmi) nmi_pending = true;
             last_nmi = nmi;
+            if(resume_count==resumes.size()) throw std::logic_error("6502 task exceeded its microcycle bound");
+            resumes[resume_count++]={value,irq,nmi_pending};
             task.handle.resume();
             if (task.handle.promise().error) std::rethrow_exception(task.handle.promise().error);
         } catch (...) {
             faulted = true;
             throw;
         }
+    }
+    template<class Archive,class Registers>
+    static void registers(Archive& archive,Registers& r) {archive(r.pc,r.s,r.a,r.x,r.y,r.p);}
+    void save(rse::state::Writer& out) const {
+        rse::state::require(!faulted);
+        registers(out,r);
+        const bool active=task.handle && !task.handle.done();
+        out(cycle,irq,nmi,last_nmi,nmi_pending,reset_pending,static_cast<std::uint8_t>(pending),active);
+        if(!active) return;
+        registers(out,task_start);
+        out(static_cast<std::uint8_t>(task_interrupt),task_reset,resume_count);
+        for(unsigned i=0;i<resume_count;++i) out(resumes[i].value,resumes[i].irq,resumes[i].nmi_pending);
+    }
+    void load(rse::state::Reader& in) {
+        using rse::state::require;
+        CpuState current;
+        registers(in,current);
+        std::uint8_t interrupt;
+        bool active;
+        bool final_irq,final_nmi_pending;
+        in(cycle,final_irq,nmi,last_nmi,final_nmi_pending,reset_pending,interrupt,active);
+        require((current.p&(U|B))==U && interrupt<=2);
+        if(active) {
+            std::uint8_t start_interrupt;
+            registers(in,task_start);
+            in(start_interrupt,task_reset,resume_count);
+            require((task_start.p&(U|B))==U && start_interrupt<=2 && !reset_pending &&
+                resume_count<resumes.size() && resume_count<=cycle && cycle);
+            task_interrupt=static_cast<Interrupt>(start_interrupt);
+            pending=task_interrupt;
+            reset_pending=task_reset;
+            r=task_start;
+            task=execute();
+            task.handle.resume();
+            for(unsigned i=0;i<resume_count;++i) {
+                auto& entry=resumes[i];
+                in(entry.value,entry.irq,entry.nmi_pending);
+                require(!writing || entry.value==value);
+                value=entry.value;
+                irq=entry.irq;
+                nmi_pending=entry.nmi_pending;
+                task.handle.resume();
+                require(!task.handle.done() && !task.handle.promise().error);
+            }
+            require(r==current && !reset_pending && pending==static_cast<Interrupt>(interrupt));
+        }
+        r=current;
+        pending=static_cast<Interrupt>(interrupt);
+        irq=final_irq;
+        nmi_pending=final_nmi_pending;
     }
 };
 
@@ -458,5 +517,11 @@ CpuState Mos6502::state() const noexcept { return impl_->r; }
 std::uint64_t Mos6502::cycles() const noexcept { return impl_->cycle; }
 bool Mos6502::at_instruction_boundary() const noexcept {
     return !impl_->faulted && !impl_->reset_pending && (!impl_->task.handle || impl_->task.handle.done());
+}
+void Mos6502::save_state(rse::state::Writer& out) const {impl_->save(out);}
+void Mos6502::load_state(rse::state::Reader& in) {
+    auto restored=std::make_unique<Impl>(impl_->bus,CpuState{},false,impl_->variant);
+    restored->load(in);
+    impl_.swap(restored);
 }
 } // namespace rse::cpu

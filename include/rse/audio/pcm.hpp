@@ -30,6 +30,15 @@ public:
         phase_=step-first; sum_=std::int64_t(value)*phase_;
         return static_cast<std::int16_t>(std::clamp(high_,-32768,32767));
     }
+    void save_state(rse::state::Writer& out) const {out(phase_,sum_,previous_,high_);}
+    void load_state(rse::state::Reader& in) {
+        NtscPcm next;
+        in(next.phase_,next.sum_,next.previous_,next.high_);
+        rse::state::require(next.phase_<19'687'500 && next.sum_>=0 &&
+            next.sum_<=std::int64_t(next.phase_)*32767 && next.previous_>=0 &&
+            next.previous_<=32767 && next.high_>=-65536 && next.high_<=65536);
+        *this=next;
+    }
 private:
     std::uint32_t phase_{};
     std::int64_t sum_{};

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <limits>
 #include <stdexcept>
+#include <utility>
 
 namespace rse::video {
 struct Rp2c02::Impl {
@@ -18,15 +19,41 @@ struct Rp2c02::Impl {
     std::array<std::uint8_t, 8> identities;
     std::array<Sprite, 8> sprites{};
     std::array<PpuFrame, 2> frames{};
-    unsigned drawing{};
+    std::uint32_t drawing{};
     std::uint16_t bg_low{}, bg_high{}, attr_low{}, attr_high{};
     std::uint8_t next_tile{}, next_attribute{}, next_low{}, next_high{};
     std::uint16_t fetch_address{}, sprite_address{};
-    unsigned eval_n{}, eval_m{}, selected{}, secondary_position{}, overflow_remaining{};
+    std::uint32_t eval_n{}, eval_m{}, selected{}, secondary_position{}, overflow_remaining{};
     std::uint8_t eval_latch{};
     bool eval_done{}, suppress_vblank{};
     std::array<std::uint8_t, 3> render_delay{};
     std::uint8_t render_enable{};
+
+    template<class Archive,class Self>
+    static void fields(Archive& archive,Self& s) {
+        auto& r=s.r;
+        archive(r.scanline,r.dot,r.v,r.t,r.fine_x,r.control,r.mask,r.status,r.oam_address,
+            r.write_toggle,r.odd,r.nmi,r.faulted,r.dots,r.frames);
+        archive(s.io,s.buffer,s.oam_bus,s.oam,s.secondary,s.palette,s.identities);
+        for(auto& sprite:s.sprites)
+            archive(sprite.x,sprite.low,sprite.high,sprite.attributes,sprite.identity,sprite.valid);
+        for(auto& frame:s.frames) archive(frame.samples,frame.number);
+        archive(s.drawing,s.bg_low,s.bg_high,s.attr_low,s.attr_high,s.next_tile,s.next_attribute,
+            s.next_low,s.next_high,s.fetch_address,s.sprite_address,s.eval_n,s.eval_m,s.selected,
+            s.secondary_position,s.overflow_remaining,s.eval_latch,s.eval_done,s.suppress_vblank,
+            s.render_delay,s.render_enable);
+    }
+    void validate() const {
+        using rse::state::require;
+        require(!r.faulted && r.scanline<262 && r.dot<341 && r.v<0x8000 && r.t<0x8000 &&
+            r.fine_x<8 && drawing<frames.size() && eval_n<=64 && eval_m<4 && selected<=8 &&
+            secondary_position<=32 && overflow_remaining<=4 && next_attribute<4);
+        require(eval_done || selected==8 || secondary_position<=4*selected+eval_m);
+        require(frames[drawing^1].number==r.frames && frames[drawing].number<=r.frames);
+        require(std::ranges::all_of(palette,[](auto color){return color<64;}));
+        for(const auto& frame:frames)
+            require(std::ranges::all_of(frame.samples,[](auto sample){return sample<512;}));
+    }
 
     explicit Impl(PpuBus& connection) : bus(connection) {
         r.scanline = 261;
@@ -350,6 +377,13 @@ std::uint8_t Rp2c02::inspect_palette(std::uint16_t address) const noexcept {
     return impl_->palette[Impl::palette_index(address)];
 }
 std::uint8_t Rp2c02::inspect_oam(std::uint8_t address) const noexcept { return impl_->oam[address]; }
+void Rp2c02::save_state(rse::state::Writer& out) const {Impl::fields(out,std::as_const(*impl_));}
+void Rp2c02::load_state(rse::state::Reader& in) {
+    auto restored=std::make_unique<Impl>(impl_->bus);
+    Impl::fields(in,*restored);
+    restored->validate();
+    impl_.swap(restored);
+}
 void Rp2c02::cpu_write(std::uint16_t select, std::uint8_t value) { impl_->cpu_write(select, value); }
 bool Rp2c02::nmi_asserted() const noexcept { return impl_->nmi(); }
 PpuState Rp2c02::state() const noexcept {

@@ -47,6 +47,11 @@ struct MachineState {
     devices::OamDmaState dma;
     bool instruction_boundary{}, irq{}, nmi{}, faulted{};
 };
+struct ReplayAction {
+    Tick tick{};
+    enum class Kind : std::uint8_t { buttons, external_irq } kind{};
+    std::uint8_t value{};
+};
 
 // Headless NTSC NROM machine. See docs/NES_SYSTEM.md for scheduling, reset,
 // open-bus policy, input timestamps, trace bounds, and verification boundaries.
@@ -61,6 +66,13 @@ public:
     [[nodiscard]] const video::PpuFrame& run_frame();
     // Deterministic new power-on timeline for the same cartridge/profile.
     void reset();
+    [[nodiscard]] std::vector<std::uint8_t> snapshot() const;
+    void restore(std::span<const std::uint8_t> bytes);
+    // Encode actions from power-on and the tick at which to stop replay.
+    [[nodiscard]] std::vector<std::uint8_t> encode_replay(Tick target,std::span<const ReplayAction> actions) const;
+    // Transactionally replace the timeline with the log's power-on state and
+    // pending inputs. Caller advances to the returned end tick.
+    [[nodiscard]] Tick load_replay(std::span<const std::uint8_t> bytes);
     // Events must be strictly in the future. Equal-time insertion order is stable.
     void schedule_input(Tick tick, std::uint8_t buttons);
     void schedule_irq(Tick tick, bool asserted);
@@ -83,6 +95,7 @@ public:
 private:
     struct Impl;
     Cartridge initial_;
+    std::uint64_t rom_identity_;
     Profile profile_;
     std::unique_ptr<Impl> impl_;
 };

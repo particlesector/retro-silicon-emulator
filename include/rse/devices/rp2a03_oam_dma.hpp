@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
+#include <rse/core/state_codec.hpp>
 #include <cstdint>
 #include <stdexcept>
 
@@ -45,7 +46,21 @@ public:
         state_.data = data; data_ready_ = true;
     }
     [[nodiscard]] OamDmaState state() const noexcept { return state_; }
+    void save_state(rse::state::Writer& out) const {fields(out,*this);}
+    void load_state(rse::state::Reader& in) {
+        Rp2a03OamDma next;
+        fields(in,next);
+        rse::state::require(next.state_.index<=256 && (!next.state_.active || next.state_.index<256) &&
+            !(next.state_.pending && next.state_.active) &&
+            next.expecting_put_==next.data_ready_ && (!next.expecting_put_ || next.state_.active));
+        *this=next;
+    }
 private:
+    template<class Archive,class Self>
+    static void fields(Archive& ar,Self& s) {
+        ar(s.state_.pending,s.state_.active,s.state_.page,s.state_.data,s.state_.index,
+            s.held_address_,s.expecting_put_,s.data_ready_);
+    }
     OamDmaState state_;
     std::uint16_t held_address_{};
     bool expecting_put_{}, data_ready_{};
