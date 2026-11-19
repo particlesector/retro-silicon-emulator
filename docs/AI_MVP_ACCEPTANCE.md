@@ -1,6 +1,6 @@
 # AI MVP acceptance (M20)
 
-Proposed gates, all pending. [Roadmap](AI_MVP_ROADMAP.md) defines milestone
+The [roadmap](AI_MVP_ROADMAP.md) defines milestone
 requirements. [M8 acceptance](MVP_ACCEPTANCE.md) remains immutable historical evidence.
 [M11 validation](M11_VALIDATION.md) records the accepted session and native RTX
 5080 playback baseline, including the failed virtual-host endurance rerun.
@@ -14,8 +14,9 @@ requirements. [M8 acceptance](MVP_ACCEPTANCE.md) remains immutable historical ev
   state, events, video and PCM, including mid-DMA/instruction.
 - [ ] Generic API exercised by fake and NES sessions; parallel independent sessions
   produce serial-equivalent results. Record 1/2/4/8/16/32 scaling where feasible.
-- [ ] Native Ubuntu 24.04 RTX 5080 training verified on actual CUDA device;
+- [x] Native Ubuntu 24.04 RTX 5080 training verified on actual CUDA device;
   checkpoint/resume, configurable observations/actions/rewards and headless CLI.
+  See [M16 validation](TRAINING_SDK.md#native-ubuntu-and-rtx-5080).
 - [ ] Project-owned NROM game autonomous level completion meets predeclared
   evaluation threshold (M17 proposed 80/100 held-out evaluation episodes),
   exceeds random baseline, reports scripted baseline and variation across at

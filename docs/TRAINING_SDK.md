@@ -98,5 +98,29 @@ PPO checkpoint and resume, and both baselines.
 A separate Windows Release run used Python 3.13.3, PyTorch 2.7.1 CPU,
 Gymnasium 1.2.2 and Stable-Baselines3 2.7.1. It completed 128 PPO timesteps
 at seed 19 and saved a checkpoint, run manifest and metrics under
-`build/m16/cpu-ppo-smoke`. The local WSL VM timed out on startup. Ubuntu
-regression testing and the native RTX 5080 CUDA smoke remain pending.
+`build/m16/cpu-ppo-smoke`.
+
+### Native Ubuntu and RTX 5080
+
+The Ubuntu handoff passed on 2026-11-18 at
+`1afd23274918c17f84994f55de2b046b102d4823`.
+
+| Item | Result |
+| --- | --- |
+| Host | Ubuntu 24.04.5 LTS, kernel 7.0.0-42-generic, Ryzen 9 7900X, 61 GiB RAM reported by `free` |
+| GPU | GeForce RTX 5080, 16,303 MiB VRAM reported by `nvidia-smi`, driver 595.99.02, compute capability 12.0 |
+| Build tools | GCC 13.3.0, CMake 3.28.3, Ninja 1.11.1 |
+| SDK | Python 3.12.3, PyTorch 2.7.1+cu128, CUDA runtime 12.8, Gymnasium 1.2.2, Stable-Baselines3 2.7.1, NumPy 2.2.6 |
+| CTest | Debug 21/21, Release with bridge and training tests 23/23 |
+| PPO smoke | Model device `cuda`, seed 19, 128 timesteps, 18,301,440 bytes peak CUDA allocation, 1.018 s elapsed |
+| Checkpoint SHA-256 | `bc21a647ab9c7c9832495c3e956da4ad0b7eda9646d692b2916f5d7520af504a` |
+
+The handoff verified the manifest, PPO metrics, and checkpoint digest.
+Logs, the dependency freeze, the manifest, metrics, and generated artifacts
+are in the local `build/m16-ubuntu.L4xb5o/` directory.
+
+The initial `python3 -m venv` command failed because the system Python
+lacked `ensurepip`. The retry created the workspace environment with
+`--without-pip` and bootstrapped pip inside it before installing the
+pinned packages. The initial error and host details are in
+`build/m16-ubuntu.EG2F3l/`.
