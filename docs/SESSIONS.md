@@ -9,6 +9,8 @@ Adapters can also expose typed, read-only [inspection and observation](INSPECTIO
 The [automation controller](AUTOMATION.md) owns a session for bounded execution
 and optional Python access.
 The NES adapter supports [portable snapshots and replay logs](STATE_REPLAY.md).
+Use [parallel headless sessions](PARALLEL_HEADLESS.md) to run independent
+environments in a bounded worker pool.
 
 ## Contract
 

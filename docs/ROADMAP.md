@@ -155,7 +155,8 @@ prove equivalence with the corresponding validated built-in definition.
 
 ## Next MVP: M12–M20
 
-M14 full state and replay are complete. M15 parallel headless execution is next.
+M14 full state and replay are complete. M15 parallel headless execution is
+implemented with Linux validation pending.
 See the [AI MVP roadmap](AI_MVP_ROADMAP.md)
 and [release acceptance](AI_MVP_ACCEPTANCE.md). Preserve the M11 validation baseline.
 

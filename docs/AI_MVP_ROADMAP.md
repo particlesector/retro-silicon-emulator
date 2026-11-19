@@ -1,6 +1,6 @@
 # AI-enabled emulation MVP (M12–M20)
 
-M14 is complete. M15 is the next milestone.
+M14 is complete. M15 is implemented and awaiting Linux validation.
 See [M11 validation](M11_VALIDATION.md) for the accepted session baseline.
 Target: native Ubuntu 24.04 LTS workstation, RTX 5080 (16 GB VRAM), 64 GB RAM;
 record actual CPU, driver, CUDA/PyTorch versions and build SHA during validation.
@@ -55,6 +55,8 @@ contracts. Existing Windows/Linux core and desktop support must not regress.
 - [ ] Benchmark 1/2/4/8/16/32 environments where feasible: frames/ticks/steps per
   second, CPU/RAM, observation bandwidth and GPU utilization once connected.
   Compare hashes with serial execution; select concurrency from measured throughput.
+
+[Parallel headless contract and benchmark](PARALLEL_HEADLESS.md)
 
 ### M16 — AI training SDK
 - [ ] Optional Gymnasium adapter with reset(seed, options), step(action),
