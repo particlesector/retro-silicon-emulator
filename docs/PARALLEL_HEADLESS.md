@@ -80,5 +80,7 @@ Three additional 180-step pairs at 32 environments gave medians of
 runs produced aggregate hash `08d82cd24f67ca9d0`.
 
 Windows Debug and Release passed all 23 suites with desktop and Python
-enabled. Ubuntu validation is pending because the local WSL VM timed out
-before configuration began.
+enabled. Linux passed headless Debug, headless Release with Python, ASan/UBSan,
+and packaged desktop smoke tests in [GitHub Actions](https://github.com/particlesector/retro-silicon-emulator/actions/runs/44466582503).
+The batch tests verify overlapping worker execution, reentrancy rejection,
+transactional slot replacement, and isolation of invalid input and CPU faults.
