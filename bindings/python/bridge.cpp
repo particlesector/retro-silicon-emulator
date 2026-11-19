@@ -104,7 +104,10 @@ int rse_py_schema(Automation* owner,Buffer** output) noexcept {
             out<<']';
             port_separator=",";
         }
-        out<<"},\"values\":{";
+        out<<"},\"video\":";
+        if(system.video) out<<'['<<system.video->width<<','<<system.video->height<<']';
+        else out<<"null";
+        out<<",\"values\":{";
         const char* separator="";
         for(const auto& info:schema.values) {
             out<<separator<<std::quoted(std::string(info.id))<<":["
@@ -134,6 +137,26 @@ int rse_py_peek(Automation* owner,const char* id,std::uint32_t address,
         const auto data=owner->peek(id,address);
         *available=data.has_value();
         *value=data.value_or(0);
+    });
+}
+int rse_py_read(Automation* owner,const char* id,std::uint32_t first,std::size_t count,
+                std::uint64_t* values,std::uint8_t* available) noexcept {
+    return invoke([&]{
+        if(count>4096) throw std::length_error("Read exceeds 4096 values");
+        std::vector<std::optional<std::uint64_t>> output(count);
+        owner->read(id,first,output);
+        for(std::size_t i=0;i<count;++i) {
+            values[i]=output[i].value_or(0);
+            available[i]=output[i].has_value();
+        }
+    });
+}
+int rse_py_frame(Automation* owner,Buffer** output) noexcept {
+    return invoke([&]{
+        const auto frame=owner->frame_rgba();
+        static_assert(sizeof(Rgba)==4);
+        const auto data=std::as_bytes(std::span(frame));
+        *output=new Buffer{{data.begin(),data.end()}};
     });
 }
 int rse_py_run(Automation* owner,const RunOptions* options,std::uint64_t* tick,

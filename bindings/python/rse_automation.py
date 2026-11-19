@@ -56,6 +56,8 @@ class _Bridge:
             "input": (_int, (_ptr, _u64, _str, p(_str), _size)),
             "schema": (_int, (_ptr, p(_ptr))),
             "peek": (_int, (_ptr, _str, _u32, p(_u64), p(_int))),
+            "read": (_int, (_ptr, _str, _u32, _size, p(_u64), p(c.c_uint8))),
+            "frame": (_int, (_ptr, p(_ptr))),
             "run": (_int, (_ptr, p(_RunOptions), p(_u64), p(_int), p(_ptr))),
             "audio": (_int, (_ptr, p(_ptr))),
             "data": (_ptr, (_ptr,)),
@@ -162,6 +164,23 @@ class Session:
         native.bridge.call("peek", native.pointer, _id(identifier), _uint(address, 32),
                            c.byref(value), c.byref(available))
         return value.value if available.value else None
+
+    def read(self, identifier, first, count):
+        native = self._handle()
+        count = _uint(count, 32)
+        if count > 4096:
+            raise ValueError("read exceeds 4096 values")
+        values, available = (_u64 * count)(), (c.c_uint8 * count)()
+        native.bridge.call("read", native.pointer, _id(identifier), _uint(first, 32),
+                           count, values, available)
+        return tuple(value if present else None for value, present in zip(values, available))
+
+    def frame_rgba(self):
+        """Return an owned RGBA frame, or empty bytes before publication."""
+        native = self._handle()
+        buffer = _ptr()
+        native.bridge.call("frame", native.pointer, c.byref(buffer))
+        return native.bridge.copy(buffer)
 
     def run(self, target, budget, *, step=None, breakpoint=None, watchpoint=None,
             capacity=0, preview=False):

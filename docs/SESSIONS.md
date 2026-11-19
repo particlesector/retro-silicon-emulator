@@ -11,6 +11,8 @@ and optional Python access.
 The NES adapter supports [portable snapshots and replay logs](STATE_REPLAY.md).
 Use [parallel headless sessions](PARALLEL_HEADLESS.md) to run independent
 environments in a bounded worker pool.
+The optional [training SDK](TRAINING_SDK.md) exposes the automation bridge to
+Gymnasium.
 
 ## Contract
 

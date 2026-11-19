@@ -1,6 +1,7 @@
 # AI-enabled emulation MVP (M12–M20)
 
-M15 is complete. M16 is the next milestone.
+M15 and M16 are complete. M16 passed Windows CPU and native Ubuntu RTX 5080
+CUDA validation.
 See [M11 validation](M11_VALIDATION.md) for the accepted session baseline.
 Target: native Ubuntu 24.04 LTS workstation, RTX 5080 (16 GB VRAM), 64 GB RAM;
 record actual CPU, driver, CUDA/PyTorch versions and build SHA during validation.
@@ -59,16 +60,18 @@ contracts. Existing Windows/Linux core and desktop support must not regress.
 [Parallel headless contract and benchmark](PARALLEL_HEADLESS.md)
 
 ### M16 — AI training SDK
-- [ ] Optional Gymnasium adapter with reset(seed, options), step(action),
+- [x] Optional Gymnasium adapter with reset(seed, options), step(action),
   observation/action spaces, reward, terminated/truncated and info; frame/action
   repeat explicitly defined, integer simulated time authoritative.
-- [ ] Configurable screen-only, memory-only and hybrid observations; task-specific
+- [x] Configurable screen-only, memory-only and hybrid observations; task-specific
   reward/termination profiles separated from machine code. Validate schema and ROM.
-- [ ] PyTorch/CUDA on RTX 5080 with pinned compatible dependencies; PPO baseline
+- [x] PyTorch/CUDA on RTX 5080 with pinned compatible dependencies; PPO baseline
   (e.g. Stable-Baselines3), random/scripted baselines, checkpoint/resume, metrics,
   seeds and run manifests. CPU fallback useful for development.
-- [ ] Verify actual CUDA execution, deterministic environment replay and a small
+- [x] Verify actual CUDA execution, deterministic environment replay and a small
   training smoke. Do not claim bitwise reproducible GPU learning across drivers.
+
+[Training SDK, validation and CUDA smoke procedure](TRAINING_SDK.md)
 
 ### M17 — Autonomous gameplay and testing
 - [ ] Build project-owned licensed NROM learning fixture with movement, obstacles,

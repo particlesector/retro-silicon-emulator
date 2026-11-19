@@ -132,6 +132,16 @@ std::vector<std::int16_t> Automation::take_audio() {
     const Command command(*this);
     return session_->take_audio();
 }
+std::vector<Rgba> Automation::frame_rgba() const {
+    const Command command(*this);
+    if(!session_->video()) return {};
+    const auto& format=session_->info().video;
+    if(!format || !format->height || format->width>1'048'576u/format->height)
+        throw std::length_error("Automation video dimensions exceed the copy limit");
+    std::vector<Rgba> frame(std::size_t(format->width)*format->height);
+    session_->convert_video(frame);
+    return frame;
+}
 void Automation::pause() noexcept {paused_.store(true,std::memory_order_release);}
 void Automation::resume() {const Command command(*this); paused_.store(false,std::memory_order_release);}
 
