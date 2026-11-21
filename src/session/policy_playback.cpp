@@ -219,6 +219,9 @@ void Playback::advance_to(Tick target) {
     } catch(...) {faulted_=true; throw;}
 }
 bool Playback::completed() const noexcept {return machine_.diagnostics().inspect_memory(0x12)==1;}
+std::uint8_t Playback::active_buttons() const noexcept {
+    return machine_.diagnostics().state().buttons;
+}
 std::vector<std::uint8_t> Playback::replay() const {
     const auto tick=status().tick;
     const auto end=std::ranges::upper_bound(actions_,tick,{},&nes::ReplayAction::tick);

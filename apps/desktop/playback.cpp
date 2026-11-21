@@ -123,6 +123,13 @@ bool Playback::has_audio() const {
 bool Playback::inspect(const std::function<bool(const session::Session&)>& query) const {
     std::lock_guard lock(mutex_);return machine_ && query(*machine_);
 }
+std::optional<std::uint64_t> Playback::peek(std::string_view id,std::uint32_t address) const {
+    std::lock_guard lock(mutex_);
+    auto* inspection=machine_ ? machine_->inspection() : nullptr;
+    if(!inspection) return std::nullopt;
+    try {return inspection->peek(id,address);}
+    catch(const std::exception&) {return std::nullopt;}
+}
 bool Playback::update_frame(Frame& frame) const {
     std::lock_guard lock(mutex_);
     if(frame.number==latest_.number)return false;

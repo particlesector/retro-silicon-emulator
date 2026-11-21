@@ -38,6 +38,7 @@ public:
     [[nodiscard]] std::vector<std::int16_t> take_audio() override {return machine_.take_audio();}
     [[nodiscard]] bool completed() const noexcept;
     [[nodiscard]] bool manual() const noexcept {return manual_;}
+    [[nodiscard]] std::uint8_t active_buttons() const noexcept;
     [[nodiscard]] std::vector<std::uint8_t> replay() const;
     [[nodiscard]] std::vector<std::uint8_t> canonical_machine_state() const {return machine_.snapshot();}
 private:

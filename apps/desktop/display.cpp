@@ -13,13 +13,14 @@ Display::Display(SDL_Window* window) {
     require_sdl(SDL_SetRenderVSync(renderer_.get(),1));
 
 }
-void Display::draw(const Frame* frame,bool verify) {
+void Display::draw(const Frame* frame,bool verify,const WorkspaceOverlay* workspace) {
     auto* r=renderer_.get();int width{},height{};
     require_sdl(SDL_SetRenderLogicalPresentation(r,0,0,SDL_LOGICAL_PRESENTATION_DISABLED));
     require_sdl(SDL_GetRenderOutputSize(r,&width,&height));
     if (width<=0 || height<=0) return;
     require_sdl(SDL_SetRenderDrawColor(r,0,0,0,255));require_sdl(SDL_RenderClear(r));
-    const auto view=viewport(width,height,frame?frame->format.display_aspect:session::Rational{4,3});
+    const auto panel=workspace ? std::min(width/2,420) : 0;
+    const auto view=viewport(width-panel,height,frame?frame->format.display_aspect:session::Rational{4,3});
     if(view.w<=0 || view.h<=0){require_sdl(SDL_RenderPresent(r));return;}
     if (frame && frame->number && !frame->pixels.empty()) {
         const auto fw=frame->format.width,fh=frame->format.height;
@@ -54,15 +55,42 @@ void Display::draw(const Frame* frame,bool verify) {
             }
             ++readbacks_;
         }
-    } else {
+    } else if(!workspace) {
         require_sdl(SDL_SetRenderLogicalPresentation(r,480,360,SDL_LOGICAL_PRESENTATION_LETTERBOX));
         require_sdl(SDL_SetRenderDrawColor(r,150,190,255,255));
         require_sdl(SDL_RenderDebugText(r,32,40,"Retro Silicon Emulator"));
         require_sdl(SDL_SetRenderDrawColor(r,210,220,235,255));
         constexpr const char* lines[]{"Open a cartridge to start.","","O / Ctrl+O    Open cartridge",
             "Or drop a .nes file here.","","X / Z         A / B","Arrow keys    Directions",
-            "Enter         Start","Right Shift   Select","","F5 Reset      Esc Exit"};
+            "Enter         Start","Right Shift   Select","","F1 AI workspace   F5 Reset   Esc Exit"};
         float y=76;for (auto* line:lines) {require_sdl(SDL_RenderDebugText(r,32,y,line));y+=18;}
+    }
+    if(workspace && panel>0) {
+        const SDL_FRect background{float(width-panel),0,float(panel),float(height)};
+        require_sdl(SDL_SetRenderDrawColor(r,19,26,40,255));
+        require_sdl(SDL_RenderFillRect(r,&background));
+        const float x=background.x+12;
+        float y=16;
+        const auto columns=std::size_t(std::max(0,panel-24)/8);
+        for(std::size_t i=0;i<workspace->lines.size() && y+10<height;++i) {
+            if(i==0) require_sdl(SDL_SetRenderDrawColor(r,136,201,255,255));
+            else require_sdl(SDL_SetRenderDrawColor(r,224,231,244,255));
+            const auto line=workspace->lines[i].substr(0,columns);
+            if(!line.empty()) require_sdl(SDL_RenderDebugText(r,x,y,line.c_str()));
+            y+=18;
+        }
+        if(const auto* preview=workspace->preview;preview && preview->number && y+48<height && panel>32) {
+            if(!preview_texture_) {
+                preview_texture_.reset(SDL_CreateTexture(r,SDL_PIXELFORMAT_RGBA32,SDL_TEXTUREACCESS_STREAMING,256,240));
+                require_sdl(bool(preview_texture_));
+                require_sdl(SDL_SetTextureScaleMode(preview_texture_.get(),SDL_SCALEMODE_NEAREST));
+            }
+            require_sdl(SDL_UpdateTexture(preview_texture_.get(),nullptr,preview->pixels.data(),256*sizeof(Rgb)));
+            const auto fitted=viewport(panel-24,height-int(y)-12,{4,3});
+            const SDL_FRect destination{x+fitted.x,y+fitted.y,float(fitted.w),float(fitted.h)};
+            if(fitted.w>0 && fitted.h>0)
+                require_sdl(SDL_RenderTexture(r,preview_texture_.get(),nullptr,&destination));
+        }
     }
     require_sdl(SDL_RenderPresent(r));
 }

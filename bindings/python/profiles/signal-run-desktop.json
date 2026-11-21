@@ -1,0 +1,17 @@
+{
+  "rom_sha256": "bc479da4a7acadde14447a308820780992c8ac756cc04daf665c6772d2aa5517",
+  "actions": [[], ["right"], ["right", "a"]],
+  "task": {
+    "id": "cpu.ram",
+    "address": 18,
+    "equals": 1,
+    "success_reward": 1.0,
+    "step_reward": -0.01
+  },
+  "memory": [{"id": "cpu.ram", "first": 16, "count": 4}],
+  "mode": "memory",
+  "ticks_per_repeat": 357368,
+  "action_repeat": 2,
+  "max_steps": 20,
+  "warmup_ticks": [757368]
+}
