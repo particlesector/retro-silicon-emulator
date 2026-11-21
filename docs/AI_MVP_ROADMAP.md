@@ -1,7 +1,7 @@
 # AI-enabled emulation MVP (M12–M20)
 
-M15 and M16 are complete. M16 passed Windows CPU and native Ubuntu RTX 5080
-CUDA validation.
+M15, M16, and M17 are complete. The M17 Signal Run experiment passed on the
+native Ubuntu RTX 5080 workstation.
 See [M11 validation](M11_VALIDATION.md) for the accepted session baseline.
 Target: native Ubuntu 24.04 LTS workstation, RTX 5080 (16 GB VRAM), 64 GB RAM;
 record actual CPU, driver, CUDA/PyTorch versions and build SHA during validation.
@@ -78,7 +78,7 @@ contracts. Existing Windows/Linux core and desktop support must not regress.
   rewards and an unambiguous finish. Keep frozen M8 fixtures unchanged.
 - [x] Pin evaluation protocol, episode budget, held-out starts, seeds and
   threshold before training (at least 80/100 and improvement over random).
-- [ ] Train/evaluate on RTX 5080; compare observation modes and report failures.
+- [x] Train/evaluate on RTX 5080; compare observation modes and report failures.
   Record model hashes, rewards and results.
   Optional user-supplied compatible commercial ROM experiment; no redistribution.
 - [x] Demonstrate automated testing via coverage/novel-state exploration or

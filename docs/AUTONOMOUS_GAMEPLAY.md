@@ -89,5 +89,49 @@ The pinned baselines completed 54/100 episodes for random (mean reward 0.624)
 and 100/100 for scripted (mean reward 1.840). Episode records are under
 `build/m17/windows-baselines-v1/`.
 
-Native Ubuntu and the nine-policy RTX 5080 experiment remain pending. The
-local WSL VM timed out before the Linux build could start.
+## Native Ubuntu and RTX 5080 validation
+
+The native handoff tested source revision
+`9fc2abc27458569540d42880dfa4025a10e2a0da` on Ubuntu 24.04.5 LTS,
+kernel `7.0.0-42-generic`, with a Ryzen 9 7900X and 61 GiB of usable RAM.
+The RTX 5080 reported 16,303 MiB of VRAM and driver `595.99.02`.
+The SDK used Python 3.12.3, PyTorch 2.7.1+cu128, CUDA runtime 12.8,
+Gymnasium 1.2.2, Stable-Baselines3 2.7.1, and NumPy 2.2.6.
+The workstation's system Python lacked `ensurepip` during M16 setup, so
+this run created the workspace venv with `--without-pip` and bootstrapped
+pip inside it before installing the pinned dependencies.
+
+Debug passed 22/22 CTest suites. Release with the Python bridge and training
+tests passed 25/25. The fixture's seeded obstacle failure and replay passed,
+and the generated replay matched the SHA-256 above.
+
+| Input | SHA-256 |
+| --- | --- |
+| Pinned protocol | `f1bad1242e07d07ae559376633fd652a130d389950ca3c5249f092bbf730ed98` |
+| Healthy ROM | `bc479da4a7acadde14447a308820780992c8ac756cc04daf665c6772d2aa5517` |
+| Defective ROM | `925f48360414965712f149a48d33b360e5e1526097f0cd1a225c332fc049a260` |
+
+The local evidence directory is `build/m17-ubuntu.sjsILs/`. It contains the
+host report, dependency freeze, test logs, generated ROMs, failure replay,
+and experiment output.
+
+### Held-out evaluation
+
+All nine policies trained on CUDA for 16,384 timesteps each. Every memory
+seed cleared the 80/100 threshold, and all policies beat random and matched
+the scripted baseline. All 100 evaluations per policy completed across the
+five held-out starts. The recorded digests matched all nine model files.
+
+| Policy | Seed | Completions | Mean reward | Train and evaluate (s) | Model SHA-256 |
+| --- | ---: | ---: | ---: | ---: | --- |
+| random | — | 54/100 | 0.624 | — | — |
+| scripted | — | 100/100 | 1.840 | — | — |
+| memory | 101 | 100/100 | 1.840 | 158.3 | `3400654378ce0f5cec5b0abb8b0f474b060c0b49fffff151cefdde52fe57a1d1` |
+| memory | 202 | 100/100 | 1.840 | 161.3 | `2d5c077c5bb1121177daca5beecd27d89da66cd17836b6e9a35d7fb19c79f4e1` |
+| memory | 303 | 100/100 | 1.840 | 161.0 | `b42f7ea1bbe7e86562f3ae1abc73a0375817a232095fe66098a9f67325e32dde` |
+| screen | 101 | 100/100 | 1.840 | 173.9 | `97a64ed115326e6284db13ba694e2d881e8bad874ec986ae827ed9019e7ed6dd` |
+| screen | 202 | 100/100 | 1.840 | 175.6 | `5032b6c97fb8e0ddfce446f418e479a7c3dfece1031a3d27e911e8a85880f712` |
+| screen | 303 | 100/100 | 1.840 | 175.1 | `f5c2999e6b2f3d84d72d48c82f13474d256b0cf9a0ff0cedd4f09b131ceae2d9` |
+| hybrid | 101 | 100/100 | 1.840 | 173.1 | `26f2e366fdc2c276f1681527485b7d12806afc2ae3b71d83657d984cd0c32ee1` |
+| hybrid | 202 | 100/100 | 1.840 | 174.2 | `5c7a4f0de4221e7facc13e59dba2f56f630bf899c64bf061e601a381cfdf9d62` |
+| hybrid | 303 | 100/100 | 1.840 | 176.3 | `6728d3bc27008728da6a25d94769dc8ae16db383d98345b279eeecdeb7cb29a9` |
