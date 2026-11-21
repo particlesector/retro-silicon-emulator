@@ -9,6 +9,9 @@ session's completed RGBA frame; failure to obtain that backend is an error, not 
 fallback. Display output uses a documented approximate RGB palette and 4:3 aspect
 ratio with letterboxing. This is not composite-video or analog color emulation.
 
+The optional [native policy player](MODEL_PLAYBACK.md) uses the same desktop
+producer and input path for autonomous play and manual takeover.
+
 Acceptance cases, specified before implementation:
 
 - `desktop-policy`: palette/emphasis conversion, 4:3 viewport bounds, input

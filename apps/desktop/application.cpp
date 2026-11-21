@@ -32,7 +32,8 @@ std::uint8_t key_mask(SDL_Scancode key) {
 }
 class Application final : public SmokeHost {
 public:
-    explicit Application(bool test,std::string_view system) : smoke(test),system_id(system) {
+    explicit Application(bool test,std::string_view system,DesktopLoad loader)
+        : smoke(test),system_id(system),loader(std::move(loader)) {
         window.reset(SDL_CreateWindow("Retro Silicon Emulator",960,720,SDL_WINDOW_RESIZABLE|SDL_WINDOW_HIGH_PIXEL_DENSITY));
         require_sdl(bool(window));display=std::make_unique<Display>(window.get());
         playback=std::make_unique<Playback>(nullptr);
@@ -41,7 +42,7 @@ public:
     }
     void load(const std::filesystem::path& path) {
         try {
-            auto next=session::load(system_id,path);
+            auto next=loader ? loader(path) : session::load(system_id,path);
             const auto filename=path.filename().u8string();
             const auto title=std::string("Retro Silicon Emulator - ")+std::string(reinterpret_cast<const char*>(filename.data()),filename.size());
             if(next->info().audio && !audio) {
@@ -58,6 +59,11 @@ public:
             input.clear();visible={};running_audio=false;
             (void)SDL_SetWindowTitle(window.get(),title.c_str());redraw=true;++loads;
         } catch (const std::exception& e) {error(std::string("Cannot open cartridge: ")+e.what()+"\nChoose a supported mapper-0 iNES image. The previous cartridge is retained.");}
+    }
+    void finish(const DesktopFinish& callback) const {
+        if(!playback->error().empty()) throw std::runtime_error(playback->error());
+        if(!playback->inspect([&](const session::Session& machine){callback(machine);return true;}))
+            throw std::runtime_error("No policy session available to record");
     }
     void reset() {
         if (!playback->loaded()) return;
@@ -200,6 +206,7 @@ private:
     std::unique_ptr<SDL_Gamepad,decltype(&SDL_CloseGamepad)> pad{nullptr,SDL_CloseGamepad};
     bool running{true},verify_next{},smoke;
     std::string system_id;
+    DesktopLoad loader;
     unsigned loads{},resets{},errors{};
     std::atomic<unsigned> starvation{};
     static void SDLCALL observe(void* userdata,SDL_AudioStream*,int additional,int) {
@@ -224,12 +231,13 @@ private:
 
 }
 } // namespace rse::desktop
-int run_desktop(const std::filesystem::path& cartridge,unsigned seconds,bool smoke,std::string_view system) {
+int run_desktop(const std::filesystem::path& cartridge,unsigned seconds,bool smoke,std::string_view system,
+                DesktopLoad loader,DesktopFinish finish) {
     using namespace rse::desktop;
     try {
-        Application app(smoke,system);if (smoke) app.step();
+        Application app(smoke,system,std::move(loader));if (smoke) app.step();
         if (!cartridge.empty()) app.load(cartridge);
-        if (smoke && !app.has_machine()) throw std::runtime_error("smoke fixture could not be loaded");
+        if ((smoke || finish) && !app.has_machine()) throw std::runtime_error("Requested session could not be loaded");
         std::unique_ptr<Smoke> script;if (smoke) script=std::make_unique<Smoke>(cartridge);
         const auto start=SDL_GetTicks();
         while (app.is_running() && (!seconds || SDL_GetTicks()-start<std::uint64_t(seconds)*1000)) {
@@ -238,6 +246,7 @@ int run_desktop(const std::filesystem::path& cartridge,unsigned seconds,bool smo
         }
         if (script) std::cerr<<"Smoke stopping audio\n";
         app.stop_audio();const auto elapsed=SDL_GetTicks()-start;app.report(elapsed,script?script->metrics():SmokeMetrics{});
+        if(finish) app.finish(finish);
         if (script) {
             if(elapsed<std::uint64_t(seconds)*1000) throw std::runtime_error("smoke exited before its requested duration");
             std::cerr<<"Smoke closing window\n";script->finish(app);
