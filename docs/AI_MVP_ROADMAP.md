@@ -115,6 +115,9 @@ CPU playback is accepted. The owner approved advancing M19 while native RTX
 training contention and CUDA playback parity are deferred to M20.
 
 ### M20 — MVP release and validation
+[Acceptance record](AI_MVP_ACCEPTANCE.md) and
+[native Ubuntu RTX 5080 handoff](M20_UBUNTU_HANDOFF.md).
+
 - [ ] Execute [AI acceptance](AI_MVP_ACCEPTANCE.md) on native target workstation;
   preserve existing platform regression and packaging gates.
 - [ ] Document installation, CLI/desktop workflows, task authoring, SDK examples,

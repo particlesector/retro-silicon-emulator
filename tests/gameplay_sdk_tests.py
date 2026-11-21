@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 import json
+from io import StringIO
 from pathlib import Path
 import subprocess
 import sys
@@ -12,7 +13,7 @@ import torch
 sys.dont_write_bytecode = True
 bridge, sdk, generator = map(Path, sys.argv[1:4])
 sys.path.insert(0, str(sdk))
-from rse_gameplay import MODES, PROTOCOL, SignalRun, scripted
+from rse_gameplay import EpisodeRewards, MODES, PROTOCOL, SignalRun, scripted
 
 protocol = json.loads(PROTOCOL.read_bytes())
 torch.set_num_threads(1)
@@ -49,7 +50,13 @@ with tempfile.TemporaryDirectory() as temp:
             # full pinned benchmark or using its evaluation episodes.
             model = PPO("MultiInputPolicy" if mode == "hybrid" else "MlpPolicy",
                         env, seed=7, device="cpu", n_steps=16, batch_size=8, n_epochs=1)
-            model.learn(total_timesteps=16)
+            curve = StringIO()
+            model.learn(total_timesteps=64, callback=EpisodeRewards(curve))
+            points = [json.loads(line) for line in curve.getvalue().splitlines()]
+            assert points
+            steps = [point["step"] for point in points]
+            assert steps == sorted(set(steps)) and 0 < steps[0] <= steps[-1] <= 64
+            assert all(np.isfinite(point["reward"]) for point in points)
             obs, _ = env.reset(seed=7)
             action, _ = model.predict(obs, deterministic=True)
             assert env.action_space.contains(action)
