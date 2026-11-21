@@ -88,14 +88,19 @@ contracts. Existing Windows/Linux core and desktop support must not regress.
 [Signal Run protocol and validation](AUTONOMOUS_GAMEPLAY.md)
 
 ### M18 — Native model playback
-- [ ] Export supported policy to ONNX; version/hash model plus preprocessing,
+
+CPU playback is accepted. The owner approved advancing M19 while native RTX
+5080 CUDA validation is pending. CUDA parity remains an M20 release gate.
+- [x] Export supported policy to ONNX; version/hash model plus preprocessing,
   input/output shapes, action mapping and task metadata. Reject incompatible models.
 - [ ] Optional C++ ONNX Runtime adapter, CPU fallback and tested CUDA provider;
   no Python runtime needed for playback. Compare inference against training tool
   on fixed inputs with declared tolerances and action-selection semantics.
-- [ ] Run real-time and headless autonomous episodes; manual takeover and clean
+- [x] Run real-time and headless autonomous episodes; manual takeover and clean
   shutdown. In synchronous mode wait for inference, never skip emulated cycles.
   Timestamp chosen actions for exact replay regardless of model nondeterminism.
+
+[Native model playback contract and validation](MODEL_PLAYBACK.md)
 
 ### M19 — Desktop AI workspace
 - [ ] SDL3/Vulkan UI for ROM/task selection, observation configuration, start/stop,
