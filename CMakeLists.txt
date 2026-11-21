@@ -174,7 +174,8 @@ if(RSE_BUILD_DESKTOP)
   find_package(SDL3 3.2 CONFIG REQUIRED COMPONENTS SDL3-shared)
   find_package(Vulkan REQUIRED)
   add_executable(rse-desktop apps/desktop/main.cpp apps/desktop/audio_player.cpp
-    apps/desktop/application.cpp apps/desktop/display.cpp apps/desktop/playback.cpp apps/desktop/smoke.cpp)
+    apps/desktop/application.cpp apps/desktop/display.cpp apps/desktop/playback.cpp apps/desktop/smoke.cpp
+    apps/desktop/trainer.cpp)
   target_link_libraries(rse-desktop PRIVATE rse_builtin_sessions rse_nes_session SDL3::SDL3-shared Vulkan::Vulkan Threads::Threads)
   if(RSE_BUILD_POLICY)
     rse_link_policy(rse-desktop)
@@ -191,6 +192,12 @@ if(RSE_BUILD_DESKTOP)
     add_custom_command(TARGET rse-desktop-playback-tests POST_BUILD COMMAND ${CMAKE_COMMAND} -E
       copy_if_different $<TARGET_FILE:SDL3::SDL3-shared> $<TARGET_FILE_DIR:rse-desktop-playback-tests>)
     add_test(NAME desktop-playback-tests COMMAND rse-desktop-playback-tests)
+    add_executable(rse-desktop-trainer-tests tests/desktop_trainer_tests.cpp apps/desktop/trainer.cpp)
+    target_include_directories(rse-desktop-trainer-tests PRIVATE apps/desktop)
+    target_link_libraries(rse-desktop-trainer-tests PRIVATE rse_session SDL3::SDL3-shared Threads::Threads)
+    add_custom_command(TARGET rse-desktop-trainer-tests POST_BUILD COMMAND ${CMAKE_COMMAND} -E
+      copy_if_different $<TARGET_FILE:SDL3::SDL3-shared> $<TARGET_FILE_DIR:rse-desktop-trainer-tests>)
+    add_test(NAME desktop-trainer-tests COMMAND rse-desktop-trainer-tests "${CMAKE_CURRENT_BINARY_DIR}/trainer-tests")
   endif()
   add_custom_command(TARGET rse-desktop POST_BUILD COMMAND ${CMAKE_COMMAND} -E
     copy_if_different $<TARGET_FILE:SDL3::SDL3-shared> $<TARGET_FILE_DIR:rse-desktop>)

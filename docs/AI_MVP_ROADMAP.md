@@ -103,13 +103,16 @@ CPU playback is accepted. The owner approved advancing M19 while native RTX
 [Native model playback contract and validation](MODEL_PLAYBACK.md)
 
 ### M19 — Desktop AI workspace
-- [ ] SDL3/Vulkan UI for ROM/task selection, observation configuration, start/stop,
+- [x] SDL3/Vulkan UI for ROM/task selection, observation configuration, start/stop,
   checkpoint/resume, model loading, live preview, reward/throughput/loss metrics,
   selected memory and controller actions. Optional trainer process, not UI thread.
-- [ ] Worker lifecycle, cancellation at safe boundaries, bounded telemetry, errors,
+- [x] Worker lifecycle, cancellation at safe boundaries, bounded telemetry, errors,
   manual takeover and disconnected trainer recovery. CLI remains fully usable.
-- [ ] Verify responsive UI and existing audio/video playback with training active;
+- [x] Verify responsive UI and existing audio/video playback with CPU training active;
   document resource limits or reduced concurrency if contention occurs.
+
+[Desktop workspace and CPU acceptance](AI_WORKSPACE.md). Native RTX 5080
+training contention and CUDA playback parity are deferred to M20.
 
 ### M20 — MVP release and validation
 - [ ] Execute [AI acceptance](AI_MVP_ACCEPTANCE.md) on native target workstation;

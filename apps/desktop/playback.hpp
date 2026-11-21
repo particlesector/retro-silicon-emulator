@@ -40,6 +40,7 @@ public:
     // Read-only diagnostic callback under the producer lock. Do not reenter
     // Playback or retain borrowed session views after the callback returns.
     [[nodiscard]] bool inspect(const std::function<bool(const session::Session&)>& query) const;
+    [[nodiscard]] std::optional<std::uint64_t> peek(std::string_view id,std::uint32_t address) const;
     bool update_frame(Frame& frame) const;
     [[nodiscard]] PlaybackStats stats() const;
     [[nodiscard]] std::string error() const;

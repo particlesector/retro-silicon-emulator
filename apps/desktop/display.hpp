@@ -3,17 +3,23 @@
 #include "presentation.hpp"
 #include <SDL3/SDL.h>
 #include <memory>
+#include <string>
 
 namespace rse::desktop {
+struct WorkspaceOverlay {
+    std::vector<std::string> lines;
+    const Frame* preview{};
+};
 class Display {
 public:
     explicit Display(SDL_Window* window);
-    void draw(const Frame* frame,bool verify=false);
+    void draw(const Frame* frame,bool verify=false,const WorkspaceOverlay* workspace=nullptr);
     [[nodiscard]] const char* backend() const noexcept {return SDL_GetRendererName(renderer_.get());}
     [[nodiscard]] unsigned readbacks() const noexcept {return readbacks_;}
 private:
     std::unique_ptr<SDL_Renderer,decltype(&SDL_DestroyRenderer)> renderer_{nullptr,SDL_DestroyRenderer};
     std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> texture_{nullptr,SDL_DestroyTexture};
+    std::unique_ptr<SDL_Texture,decltype(&SDL_DestroyTexture)> preview_texture_{nullptr,SDL_DestroyTexture};
     unsigned readbacks_{},texture_width_{},texture_height_{};
 };
 void require_sdl(bool success);

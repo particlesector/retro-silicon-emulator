@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 
 sys.dont_write_bytecode = True
 bridge, sdk, fixture_generator = map(Path, sys.argv[1:4])
@@ -95,3 +96,26 @@ with tempfile.TemporaryDirectory() as directory:
     for method in ("random", "scripted"):
         _, manifest = train(method, "--method", method)
         assert manifest["method"] == method and manifest["timesteps"] == 32
+
+    live = root / "live"
+    stop = root / "stop.request"
+    trainer = subprocess.Popen([sys.executable, "-B", sdk / "rse_train.py", "--bridge", bridge,
+                                "--rom", rom_path, "--profile", profile, "--out", live, "--device",
+                                "cpu", "--steps", "32768", "--rollout", "16", "--live",
+                                "--stop-file", stop])
+    try:
+        deadline = time.monotonic() + 45
+        while not (live / "live.txt").exists() and trainer.poll() is None and time.monotonic() < deadline:
+            time.sleep(0.02)
+        assert (live / "live.txt").read_text().startswith("RSE19 ")
+        stop.touch()
+        assert trainer.wait(timeout=30) == 0
+        manifest = json.loads((live / "manifest.json").read_bytes())
+        assert manifest["status"] == "stopped"
+        assert 0 < manifest["timesteps"] < 32768 and manifest["timesteps"] % 16 == 0
+        assert (live / "preview.rgb").stat().st_size == 256 * 240 * 3
+        assert (live / "checkpoint.zip").is_file()
+    finally:
+        if trainer.poll() is None:
+            trainer.kill()
+            trainer.wait()

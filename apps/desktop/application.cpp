@@ -4,17 +4,38 @@
 #include "playback.hpp"
 #include "playback_timing.hpp"
 #include "smoke.hpp"
+#include "trainer.hpp"
 #include <rse/session/builtins.hpp>
 #include <rse/session/time.hpp>
 #include "nes_controls.hpp"
 #include <atomic>
+#include <future>
+#include <iomanip>
 #include <iostream>
 #include <mutex>
 #include <optional>
+#include <sstream>
+#ifdef RSE_POLICY_ENABLED
+#include <rse/session/policy_playback.hpp>
+#endif
 
 namespace rse::desktop {
 namespace {
-struct DialogResult {std::mutex mutex;bool pending{},ready{};std::string path,error;};
+enum class DialogKind { rom, profile, checkpoint, model };
+struct DialogResult {
+    std::mutex mutex;
+    bool pending{},ready{};
+    std::string path,error;
+    DialogKind kind{DialogKind::rom};
+};
+std::string display_name(const std::filesystem::path& path) {
+    if(path.empty()) return "None";
+    const auto name=path.filename().u8string();
+    // SDL debug text uses ASCII glyphs. Preserve the original path internally.
+    std::string result;
+    for(const auto ch:name) result+=ch>=32 && ch<127 ? char(ch) : '?';
+    return result;
+}
 void SDLCALL selected(void* userdata,const char* const* files,int) {
     std::unique_ptr<std::shared_ptr<DialogResult>> token(static_cast<std::shared_ptr<DialogResult>*>(userdata));
     auto& result=**token;std::lock_guard lock(result.mutex);
@@ -32,8 +53,9 @@ std::uint8_t key_mask(SDL_Scancode key) {
 }
 class Application final : public SmokeHost {
 public:
-    explicit Application(bool test,std::string_view system,DesktopLoad loader)
-        : smoke(test),system_id(system),loader(std::move(loader)) {
+    explicit Application(bool test,std::string_view system,DesktopLoad loader,DesktopWorkspace workspace)
+        : smoke(test),system_id(system),loader(std::move(loader)),workspace_(std::move(workspace)) {
+        if(workspace_.trainer) trainer_=std::make_unique<Trainer>(*workspace_.trainer);
         window.reset(SDL_CreateWindow("Retro Silicon Emulator",960,720,SDL_WINDOW_RESIZABLE|SDL_WINDOW_HIGH_PIXEL_DENSITY));
         require_sdl(bool(window));display=std::make_unique<Display>(window.get());
         playback=std::make_unique<Playback>(nullptr);
@@ -43,6 +65,11 @@ public:
     void load(const std::filesystem::path& path) {
         try {
             auto next=loader ? loader(path) : session::load(system_id,path);
+            replace_session(std::move(next),path);
+            model_name_.clear();
+        } catch (const std::exception& e) {error(std::string("Cannot open cartridge: ")+e.what()+"\nChoose a supported mapper-0 iNES image. The previous cartridge is retained.");}
+    }
+    void replace_session(std::unique_ptr<session::Session> next,const std::filesystem::path& path) {
             const auto filename=path.filename().u8string();
             const auto title=std::string("Retro Silicon Emulator - ")+std::string(reinterpret_cast<const char*>(filename.data()),filename.size());
             if(next->info().audio && !audio) {
@@ -57,8 +84,115 @@ public:
                 stop_audio();playback=std::move(producer);audio=std::move(stream);
             } else {stop_audio();playback->replace(std::move(next));}
             input.clear();visible={};running_audio=false;
+            rom_=path;
             (void)SDL_SetWindowTitle(window.get(),title.c_str());redraw=true;++loads;
-        } catch (const std::exception& e) {error(std::string("Cannot open cartridge: ")+e.what()+"\nChoose a supported mapper-0 iNES image. The previous cartridge is retained.");}
+    }
+    void start_trainer(bool resume) {
+        if(!trainer_) throw std::logic_error("Launch with trainer settings to enable training");
+        const auto checkpoint=checkpoint_.empty() ? trainer_->checkpoint() : checkpoint_;
+        if(resume && checkpoint.empty()) throw std::logic_error("Select a checkpoint with F4 first");
+        trainer_->start(rom_,workspace_.profile,workspace_.observation,resume ? checkpoint : std::filesystem::path{});
+        if(resume) checkpoint_.clear();
+        workspace_status_.clear();
+        workspace_.visible=true;
+        redraw=true;
+    }
+    void load_model(const std::filesystem::path& path) {
+#ifdef RSE_POLICY_ENABLED
+        if(rom_.empty() || loader || model_future_.valid())
+            throw std::logic_error("Select a ROM and wait for any model load to finish");
+        pending_rom_=rom_;
+        pending_model_=path;
+        model_future_=std::async(std::launch::async,[rom=rom_,path] {
+            const auto bytes=policy::read_file(rom,64*1024);
+            auto model=std::make_shared<policy::Model>(path,policy::Provider::automatic);
+            return std::make_unique<policy::Playback>(std::move(model),bytes);
+        });
+        workspace_status_="Loading model";
+#else
+        (void)path;
+        throw std::logic_error("Model loading requires RSE_BUILD_POLICY");
+#endif
+    }
+    void poll_workspace() {
+        if(trainer_ && trainer_->poll() && workspace_.visible) redraw=true;
+#ifdef RSE_POLICY_ENABLED
+        if(model_future_.valid() && model_future_.wait_for(std::chrono::seconds(0))==std::future_status::ready) {
+            try {
+                auto model=model_future_.get();
+                if(rom_!=pending_rom_) throw std::logic_error("ROM changed during model load");
+                replace_session(std::move(model),pending_rom_);
+                model_name_=display_name(pending_model_);
+                workspace_status_.clear();
+            } catch(const std::exception& e) {workspace_status_=e.what();std::cerr<<workspace_status_<<'\n';}
+            redraw=true;
+        }
+#endif
+    }
+    void workspace_key(SDL_Scancode code) {
+        if(code==SDL_SCANCODE_F1) {workspace_.visible=!workspace_.visible;redraw=true;return;}
+        if(!workspace_.visible) return;
+        try {
+            switch(code) {
+            case SDL_SCANCODE_F2: open(DialogKind::profile);break;
+            case SDL_SCANCODE_F3: open(DialogKind::model);break;
+            case SDL_SCANCODE_F4: open(DialogKind::checkpoint);break;
+            case SDL_SCANCODE_F6: start_trainer(false);break;
+            case SDL_SCANCODE_F7:
+                if(workspace_.observation.empty()) workspace_.observation="memory";
+                else if(workspace_.observation=="memory") workspace_.observation="screen";
+                else if(workspace_.observation=="screen") workspace_.observation="hybrid";
+                else workspace_.observation.clear();
+                break;
+            case SDL_SCANCODE_F8:
+                if(trainer_) {trainer_->stop();workspace_status_.clear();}
+                break;
+            case SDL_SCANCODE_F9: start_trainer(true);break;
+            case SDL_SCANCODE_F10: if(!model_name_.empty()) {auto path=rom_;load(path);}break;
+            case SDL_SCANCODE_F11: watch_=watch_==0x13 ? 0x10 : watch_+1;break;
+            default: return;
+            }
+        } catch(const std::exception& e) {workspace_status_=e.what();}
+        redraw=true;
+    }
+    WorkspaceOverlay overlay() const {
+        const auto number=[](std::optional<double> value) {
+            if(!value) return std::string("--");
+            std::ostringstream out;out<<std::fixed<<std::setprecision(2)<<*value;return out.str();
+        };
+        std::ostringstream memory;
+        memory<<"F11 RAM $"<<std::hex<<std::uppercase<<watch_<<" = ";
+        if(const auto value=playback->peek("cpu.ram",watch_)) memory<<'$'<<*value;
+        else memory<<"--";
+        auto buttons=input.buttons();
+        std::string control="Manual";
+#ifdef RSE_POLICY_ENABLED
+        (void)playback->inspect([&](const session::Session& machine) {
+            if(const auto* player=dynamic_cast<const policy::Playback*>(&machine)) {
+                buttons=player->active_buttons();
+                if(!player->manual()) control="Policy";
+            }
+            return true;
+        });
+#endif
+        memory<<"   "<<control<<" $"<<unsigned(buttons);
+        WorkspaceOverlay result{{"AI workspace  F1 hide",
+            "O  ROM: "+display_name(rom_),"F2 Task: "+display_name(workspace_.profile),
+            "F7 Observation: "+(workspace_.observation.empty()?"profile":workspace_.observation),
+            "F3 Model: "+(model_name_.empty()?(loader?"startup policy":"None"):model_name_),
+            "F4 Checkpoint: "+display_name(checkpoint_.empty() && trainer_ ? trainer_->checkpoint() : checkpoint_),
+            "F6 Start  F8 Stop  F9 Resume  F10 Unload",memory.str()},nullptr};
+        if(!workspace_status_.empty()) result.lines.push_back(workspace_status_);
+        if(trainer_) {
+            const auto& data=trainer_->metrics();
+            result.lines.push_back(trainer_->status());
+            result.lines.push_back("Steps "+std::to_string(data.steps)+"   /s "+number(data.rate));
+            result.lines.push_back("Reward "+number(data.reward)+"   Loss "+number(data.loss));
+            result.lines.push_back("Trainer action "+(data.action ? std::to_string(*data.action) : "--"));
+            result.lines.push_back("Trainer preview");
+            result.preview=&trainer_->preview();
+        } else result.lines.push_back("Trainer is not configured");
+        return result;
     }
     void finish(const DesktopFinish& callback) const {
         if(!playback->error().empty()) throw std::runtime_error(playback->error());
@@ -86,6 +220,7 @@ public:
                 if (e.key.scancode==SDL_SCANCODE_ESCAPE) running=false;
                 if (e.key.scancode==SDL_SCANCODE_F5) reset();
                 if (e.key.scancode==SDL_SCANCODE_O) open();
+                workspace_key(e.key.scancode);
             }
         }
     }
@@ -93,15 +228,29 @@ public:
         const auto pump_start=SDL_GetTicksNS();
         SDL_Event e;while (SDL_PollEvent(&e)) event(e);
         std::optional<std::string> path,problem;
+        DialogKind kind=DialogKind::rom;
         {std::lock_guard lock(dialog->mutex);if (dialog->ready) {
             dialog->ready=false;path=std::move(dialog->path);problem=std::move(dialog->error);
+            kind=dialog->kind;
             dialog->path.clear();dialog->error.clear();
         }}
         if (path) {
             modal=false;input.focus((SDL_GetWindowFlags(window.get())&SDL_WINDOW_INPUT_FOCUS)!=0);
         }
         if (problem && !problem->empty()) error("File selection failed: "+*problem+"\nYou can also drop a .nes file into the window.");
-        else if (path && !path->empty()) load(utf8_path(*path));
+        else if (path && !path->empty()) {
+            try {
+                auto selection=utf8_path(*path);
+                switch(kind) {
+                case DialogKind::rom: load(selection);break;
+                case DialogKind::model: load_model(selection);break;
+                case DialogKind::profile: workspace_.profile=std::move(selection);workspace_status_.clear();break;
+                case DialogKind::checkpoint: checkpoint_=std::move(selection);workspace_status_.clear();break;
+                }
+                redraw=true;
+            } catch(const std::exception& e) {workspace_status_=e.what();redraw=true;}
+        }
+        poll_workspace();
         std::uint8_t buttons=0;
         if (pad && SDL_GamepadConnected(pad.get())) {
             constexpr SDL_GamepadButton map[]{SDL_GAMEPAD_BUTTON_SOUTH,SDL_GAMEPAD_BUTTON_WEST,
@@ -129,7 +278,12 @@ public:
         const bool playing=playback->loaded() && !minimized && !modal;
         playback->active(playing);
         redraw=playback->update_frame(visible)||redraw;
-        if (!minimized && (redraw || verify_next)) {display->draw(playback->loaded()?&visible:nullptr,smoke && verify_next);redraw=false;}
+        if (!minimized && (redraw || verify_next)) {
+            const auto workspace=workspace_.visible ? std::optional{overlay()} : std::nullopt;
+            display->draw(playback->loaded()?&visible:nullptr,smoke && verify_next,
+                workspace ? &*workspace : nullptr);
+            redraw=false;
+        }
         if (playing && playback->has_audio() && !running_audio && playback->ready()) {require_sdl(SDL_ResumeAudioStreamDevice(audio.get()));running_audio=true;}
         verify_next=false;
         max_step_work_us=std::max(max_step_work_us,(SDL_GetTicksNS()-step_start)/1000);
@@ -154,11 +308,14 @@ public:
             input.focus((SDL_GetWindowFlags(window.get())&SDL_WINDOW_INPUT_FOCUS)!=0);
         }
     }
-    void open() {
-        {std::lock_guard lock(dialog->mutex);if (dialog->pending) return;dialog->pending=true;}
+    void open(DialogKind kind=DialogKind::rom) {
+        {std::lock_guard lock(dialog->mutex);if (dialog->pending || dialog->ready) return;
+            dialog->pending=true;dialog->kind=kind;}
         modal=true;input.focus(false);pause_audio();
-        static const SDL_DialogFileFilter filters[]{{"NES cartridge","nes"},{"All files","*"}};
-        SDL_ShowOpenFileDialog(selected,new std::shared_ptr<DialogResult>(dialog),window.get(),filters,2,nullptr,false);
+        static const SDL_DialogFileFilter filters[]{
+            {"NES cartridge","nes"},{"Task profile","json"},{"PPO checkpoint","zip"},{"ONNX policy bundle","rsep"}};
+        SDL_ShowOpenFileDialog(selected,new std::shared_ptr<DialogResult>(dialog),window.get(),
+            &filters[static_cast<unsigned>(kind)],1,nullptr,false);
     }
     void report(std::uint64_t elapsed_ms,const SmokeMetrics& metrics) const {
         const auto stats=playback->stats();
@@ -174,6 +331,8 @@ public:
                  <<" starvation_bytes="<<starvation_bytes.load()<<" first_starvation_tick="<<first_starvation.load()
                  <<" last_starvation_tick="<<last_starvation.load();
         metrics.report(std::cout);
+        if(trainer_) std::cout<<" trainer_steps="<<trainer_->metrics().steps
+            <<" trainer_preview="<<trainer_->preview().number;
         std::cout<<" producer_priority="<<(stats.high_priority?"high":"normal")<<'\n';
     }
     [[nodiscard]] bool is_running() const noexcept {return running;}
@@ -207,6 +366,15 @@ private:
     bool running{true},verify_next{},smoke;
     std::string system_id;
     DesktopLoad loader;
+    DesktopWorkspace workspace_;
+    std::filesystem::path rom_,checkpoint_;
+    std::unique_ptr<Trainer> trainer_;
+    std::string model_name_,workspace_status_;
+    std::uint32_t watch_{0x10};
+#ifdef RSE_POLICY_ENABLED
+    std::filesystem::path pending_rom_,pending_model_;
+    std::future<std::unique_ptr<policy::Playback>> model_future_;
+#endif
     unsigned loads{},resets{},errors{};
     std::atomic<unsigned> starvation{};
     static void SDLCALL observe(void* userdata,SDL_AudioStream*,int additional,int) {
@@ -232,12 +400,14 @@ private:
 }
 } // namespace rse::desktop
 int run_desktop(const std::filesystem::path& cartridge,unsigned seconds,bool smoke,std::string_view system,
-                DesktopLoad loader,DesktopFinish finish) {
+                DesktopLoad loader,DesktopFinish finish,DesktopWorkspace workspace) {
     using namespace rse::desktop;
     try {
-        Application app(smoke,system,std::move(loader));if (smoke) app.step();
+        const bool autostart=workspace.autostart;
+        Application app(smoke,system,std::move(loader),std::move(workspace));if (smoke) app.step();
         if (!cartridge.empty()) app.load(cartridge);
         if ((smoke || finish) && !app.has_machine()) throw std::runtime_error("Requested session could not be loaded");
+        if(autostart) app.start_trainer(false);
         std::unique_ptr<Smoke> script;if (smoke) script=std::make_unique<Smoke>(cartridge);
         const auto start=SDL_GetTicks();
         while (app.is_running() && (!seconds || SDL_GetTicks()-start<std::uint64_t(seconds)*1000)) {
