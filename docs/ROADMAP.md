@@ -155,8 +155,10 @@ prove equivalence with the corresponding validated built-in definition.
 
 ## Next MVP: M12–M20
 
-M15 parallel headless execution and M16 AI training SDK are complete.
+M15 parallel headless execution, M16 AI training SDK, and M17 autonomous
+gameplay and testing are complete.
 See the [M16 Ubuntu and RTX 5080 validation](TRAINING_SDK.md#native-ubuntu-and-rtx-5080).
+See the [M17 Signal Run validation](AUTONOMOUS_GAMEPLAY.md#native-ubuntu-and-rtx-5080-validation).
 See the [AI MVP roadmap](AI_MVP_ROADMAP.md)
 and [release acceptance](AI_MVP_ACCEPTANCE.md). Preserve the M11 validation baseline.
 

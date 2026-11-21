@@ -17,14 +17,17 @@ requirements. [M8 acceptance](MVP_ACCEPTANCE.md) remains immutable historical ev
 - [x] Native Ubuntu 24.04 RTX 5080 training verified on actual CUDA device;
   checkpoint/resume, configurable observations/actions/rewards and headless CLI.
   See [M16 validation](TRAINING_SDK.md#native-ubuntu-and-rtx-5080).
-- [ ] Project-owned NROM game autonomous level completion meets predeclared
-  evaluation threshold (M17 proposed 80/100 held-out evaluation episodes),
+- [x] Project-owned NROM game autonomous level completion meets predeclared
+  evaluation threshold (80/100 held-out evaluation episodes for each M17 memory seed),
   exceeds random baseline, reports scripted baseline and variation across at
-  least three training seeds. Report failures rather than cherry-pick results.
+  least three training seeds. See [M17 held-out evaluation](AUTONOMOUS_GAMEPLAY.md#held-out-evaluation).
 - [ ] Compare memory-only, screen-only and hybrid experiments with fixed budgets;
   success of all variants is not required. Record time/steps and reward curves.
-- [ ] Automated testing finds an intentionally seeded defect and exports a
+  M17 recorded fixed-budget results, elapsed times, and final evaluation rewards.
+  Reward curves remain pending for M20.
+- [x] Automated testing finds an intentionally seeded defect and exports a
   deterministic replay; report coverage and limits, no universal bug claim.
+  See [M17 failure reproduction](AUTONOMOUS_GAMEPLAY.md#automated-failure-reproduction).
 - [ ] Export/load model in optional C++ runtime, verify inference parity within
   declared tolerances, autonomous real-time playback and manual takeover.
 - [ ] Desktop training configuration, preview, metrics, checkpoint and recovery;
