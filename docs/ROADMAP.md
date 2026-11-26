@@ -1,6 +1,6 @@
 # Development roadmap
 
-The NTSC NES and AI-enabled MVPs are complete. The next system is the Game Boy Advance, with Pokémon LeafGreen as the first private gameplay target. [GBA implementation and acceptance milestones](GBA_ROADMAP.md)
+The NTSC NES and AI-enabled MVPs are complete. The next system is the Game Boy Advance. Its first release goal is single-player LeafGreen through the Boulder Badge (M21–M26). Its second is a persistent FireRed–LeafGreen trade between two players on a LAN (M27–M30). [GBA implementation and acceptance milestones](GBA_ROADMAP.md)
 
 | Completed | Delivered | Evidence |
 | --- | --- | --- |
