@@ -23,9 +23,13 @@ Each milestone depends on the preceding one and may span several PRs. Before imp
 
 ### M21 · ARM7TDMI execution
 
-- [ ] A project-owned program boots on a test bus, branches from ARM to Thumb and back, writes a hand-calculated RAM signature and reaches the expected final PC. The core builds independently of the GBA system.
-- [ ] ARM and Thumb instruction cases compare registers, flags and memory against independent expectations. Cover arithmetic and shift carry, conditional branches, pipeline-visible PC, aligned and unaligned transfers, and bus access widths.
-- [ ] Exception tests check the software interrupt and IRQ vectors, banked registers, saved status and return PC. Running the same fixture in one budget and in smaller chunks yields the same state and ordered bus transactions.
+- [x] The project-owned `interworking` fixture boots on an independent test bus, branches from ARM to Thumb and back, writes the word `0x0000005A` at `0x84`, and reaches ARM PC `0x44`. It checks every logical fetch and store.
+- [x] ARM and Thumb cases check registers, flags, PC and RAM against hand-calculated results. `arm_flags_and_branches`, `thumb_flags_and_branches` and `register_shift_edges` exercise arithmetic, shift carry, conditional branches and pipeline-visible PC. `transfer_widths` checks byte, halfword and word transactions, including the aligned bus address and rotated result of an unaligned word load in each instruction set.
+- [x] `arm_exception_boundaries` and `thumb_exception_boundaries` check SWI at `0x08`, IRQ at `0x18`, banked SP/LR, saved status and return PC. A held IRQ crosses a masked SWI handler and is taken before the resumed Thumb fetch. The same fixture run in one 20-step budget, at handler boundaries, and in uneven chunks matches across CPU state (including dormant banks), RAM and the complete ordered bus trace.
+
+All cases run in [arm7tdmi-tests](../tests/arm7tdmi_tests.cpp). Headless CTest passed 23/23 on Windows MSVC in Debug and Release and on Ubuntu 24.04 WSL with GCC 13.3 in Release.
+
+The [CPU interface](../include/rse/cpu/arm7tdmi.hpp) counts instruction boundaries and IRQ entries. Bus observations cover logical accesses. Physical prefetch and refill cycles, wait states and BIOS execution need system-level validation. The tested subset covers User/System, Supervisor and IRQ banks. Additional instructions, modes and odd-address halfword behavior need separate coverage as the boot path exercises them. Instruction and exception expectations follow sections 3–5 of the [ARM7TDMI Data Sheet, DDI 0029E](https://blogs.igalia.com/aboya/files/2025/08/ARM7TDMI-Manual-1995.pdf).
 
 ### M22 · GBA memory map and BIOS boot
 
