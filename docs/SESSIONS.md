@@ -1,18 +1,10 @@
-# Machine sessions (M10)
+# Machine sessions
 
 The internal C++ application boundary is [Session](../include/rse/session/session.hpp).
 It is source-level code, not a plugin ABI, serialized state format or universal
 chip interface. `rse_session` has no system, SDL3 or Vulkan dependency. The
 `rse_nes_session` adapter and `rse_builtin_sessions` factory are headless libraries.
 CLI, desktop and audio-only playback use this boundary through the built-in factory.
-Adapters can also expose typed, read-only [inspection and observation](INSPECTION.md).
-The [automation controller](AUTOMATION.md) owns a session for bounded execution
-and optional Python access.
-The NES adapter supports [portable snapshots and replay logs](STATE_REPLAY.md).
-Use [parallel headless sessions](PARALLEL_HEADLESS.md) to run independent
-environments in a bounded worker pool.
-The optional [training SDK](TRAINING_SDK.md) exposes the automation bridge to
-Gymnasium.
 
 ## Contract
 
@@ -71,31 +63,7 @@ allocated event timeline; callers bound future-event volume. No extra frame FIFO
 is introduced. The accepted approximate RGB palette/emphasis conversion is shared
 by the adapter and existing desktop wrapper; this is not an analog decoder.
 
-## Reference and acceptance cases
-
-`session-tests` checks the contract using the three frozen M8 programs and a
-test-only fake with different clock/video/audio metadata and optional outputs.
-Expected NES results are exact equality with direct-machine state/RAM, trace,
-indexed frames and PCM across the same input timeline, chunked advancement and
-reset. Invalid requests must not mutate state; faults require reset; copied
-output must survive reset. Palette extraction must preserve all 512 RGBA results.
-The fake is not registered as a public system. Existing frozen fixture tests,
-CLI behavior and chip reference cases remain required and unchanged.
-
-## Validation
-
-On 2026-11-15, Windows MSVC 19.44 Debug and Release and Ubuntu 24.04 WSL
-GCC 13.3 Release passed all 19 desktop-enabled CTest suites. The final added
-input atomicity and image ownership cases also passed Windows Debug. Frozen
-M8 fixture bytes and captures were unchanged. All 512 palette/emphasis RGBA
-values retain the pre-extraction FNV-1a hash `eb035541bc4109e5`.
-
-The Linux Vulkan/Xvfb scripted desktop check uses dummy audio; it verifies the
-existing application flow and renderer, not audible continuity or physical input
-latency. CLI/desktop execution migration and repeated real-device endurance
-remain M11 work. Session contract tests themselves require neither SDL nor Vulkan.
-
-## Application integration (M11)
+## Application integration
 
 The default system remains `nes-ntsc`. CLI and desktop accept an optional
 `--system nes-ntsc`; unknown IDs fail explicitly before media/device access.
@@ -135,3 +103,73 @@ reconfiguration, 3x2 RGBA video, missing outputs, reset/replacement and recovery
 `rse-desktop-render-tests` checks Vulkan readback with non-NES dimensions/aspect
 and texture replacement; run it on a display (or Xvfb/lavapipe), separately from
 the ordinary display-free CTest suites. No fake system is publicly registered.
+
+## Snapshots and replay
+
+`Session::snapshot()` returns an owned byte vector. `Session::restore(bytes)`
+accepts snapshots from the same supported machine, cartridge and deterministic
+profile. The NES adapter implements both operations. A session without this
+capability throws `UnsupportedOperation`. The serialized C++ automation API
+and optional Python session expose the same calls. The caller may store the
+bytes in a binary file and load them into another matching instance.
+
+## State and output cursors
+
+The snapshot captures the committed master tick, CPU and PPU clock edges,
+interrupt lines, bus latch, CPU registers and pending micro-operation, PPU
+pipeline and both frame buffers, APU sequencer and channel state, OAM/DMC DMA,
+RAM, writable CHR, controller shift state, pending events in insertion order,
+and PCM integration and filter state. The NTSC NROM adapter has no RNG or
+switchable mapper bank registers.
+
+The 6502 stores a bounded transcript of bus results and interrupt state for
+the active instruction or reset/interrupt entry sequence. Restore rebuilds the
+coroutine in a new core using only that transcript. Held DMA slots do not
+advance the coroutine. The scheduler, DMA state and CPU cycle counter preserve
+their timing. Rebuilding the coroutine performs no live bus transactions.
+
+Restore constructs and validates a replacement machine before committing it.
+On success the latest published frame is available at its saved frame number,
+including when a subsequent frame was in progress. Pending PCM and trace
+records are cleared, and active observation subscriptions are discarded.
+The next PCM samples use the restored integration phase and filter history.
+The caller should flush any samples or frames already copied to host queues,
+then prime those queues from the restored session. Automation pause state is a
+host control and stays with its owner. Faulted machines can be recovered by
+restoring a valid snapshot. Snapshot capture requires a healthy machine.
+
+## Portable format and action logs
+
+Version 1 uses fixed-width little-endian fields with explicit encodings for
+booleans and optionals. The file envelope contains a four-byte type tag, a
+16-bit version, 16 reserved zero bits, 64-bit cartridge and configuration
+identities, a 32-bit payload length, and a 64-bit payload integrity hash.
+The type tags are `RESS` for snapshots and `RESL` for action logs. The hashes
+are FNV-1a checks for compatibility and accidental corruption. The cartridge
+identity covers accepted PRG and immutable CHR bytes, mirroring and CHR type.
+The configuration identity covers CPU/PPU phases, DMA parity and PCM capture.
+Trace and host queue limits are properties of the receiving session.
+
+Payloads are bounded to 12,000,000 bytes and at most 1,000,000 scheduled
+actions. Restore validates the envelope, consumed length, clock consistency
+and chip field bounds. Unsupported versions and incompatible files fail
+before replacing the destination.
+
+`nes::Machine::encode_replay(target, actions)` records a power-on replay.
+Its payload starts with the inclusive 64-bit end tick and 32-bit action count.
+Each action contains a 64-bit tick, one-byte kind and one-byte value. The
+kind is 0 for a controller button mask or 1 for an external IRQ level.
+Actions use strictly positive timestamps ordered by tick. Equal-time records
+preserve insertion order. Controller bits use the NES adapter's standard A,
+B, Select, Start, Up, Down, Left and Right order, starting at bit zero.
+
+`load_replay(bytes)` creates a fresh power-on timeline and returns the end
+tick. Advance toward it in any chunk sizes, draining PCM as needed. A failure
+log uses a target at or after the failing operation. The replay test checks
+that a project-owned NROM program reproduces the same unsupported opcode,
+address and trace event across different chunk sizes.
+Run `rse-snapshot-tests <output-directory>` to export the failing ROM and
+its portable action log, along with a regular snapshot and action log for
+the project-owned loop fixture.
+
+For inspection, execution controls, Python observation batches and multi-session execution, see [Automation](AUTOMATION.md).

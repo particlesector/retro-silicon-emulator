@@ -10,15 +10,15 @@ and desktop application. It has three complementary long-term goals:
 - Enable machine-independent observation and control for AI learning, automated
   software testing and hardware verification across historical and custom machines.
 
-The first usable product is an NTSC NES emulator. A working machine comes before
+The first released system is an NTSC NES emulator. A working machine comes before
 a generic framework demonstration. Apple IIe is a later target for proving reuse;
 educational computers, other consoles, and a visual workbench extend that goal.
 Build abstractions from real machine requirements, not speculative universality.
 
 This document preserves the long-term intent of the original 2026-11-13 technical
 specification. [Architecture](ARCHITECTURE.md) describes design boundaries and
-current contracts. [Roadmap](ROADMAP.md) records the completed first MVP and the
-current milestones and acceptance gates. Future directions here are not additional
+current contracts. [Roadmap](ROADMAP.md) records the completed NES and AI MVPs and the
+current GBA milestones and acceptance gates. Future directions here are not additional
 milestone requirements or claims of implemented functionality.
 
 ## Product surfaces
@@ -126,12 +126,4 @@ or embedded scripting is required for the initial releases.
 
 ## Intelligence and automation
 
-Emulate. Create. Train. Verify. The proposed [second MVP](AI_MVP_ROADMAP.md)
-adds optional AI SDK/training and native model execution, initially for NES NROM.
-Agents observe memory, registers, events, video and audio as supported, then
-submit timestamped input at defined boundaries. The same interface serves
-traditional test tools and future workbench machines. Task rewards and models
-remain external to hardware; arbitrary application competence is a research goal,
-not a release promise. CPU simulation remains the timing authority while CUDA
-accelerates learning and inference. Support both human-visible real-time operation
-and parallel accelerated headless runs.
+The NES implementation supports optional training and native policy execution. Agents observe memory, registers, events, video and audio as available and submit timestamped inputs at defined boundaries. Hardware state and task rewards have separate owners. The same interfaces support human-visible playback, headless tests and parallel training. CPU simulation sets hardware timing while CUDA can accelerate learning and inference. [Training and playback](TRAINING_SDK.md)
