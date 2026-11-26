@@ -120,6 +120,17 @@ void Arm7Tdmi::step() {
     else execute_arm(bus_.fetch_arm(state_.pc));
 }
 
+bool Arm7Tdmi::step_with_stalls() {
+    const auto before = state_;
+    try {
+        step();
+        return true;
+    } catch (const Arm7Bus::Stall&) {
+        state_ = before;
+        return false;
+    }
+}
+
 Word Arm7Tdmi::operand(unsigned reg) const {
     return reg == 15 ? state_.pc + (state_.thumb() ? 4 : 8) : state_.registers[reg];
 }

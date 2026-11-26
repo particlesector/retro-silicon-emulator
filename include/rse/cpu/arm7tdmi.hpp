@@ -9,6 +9,10 @@ namespace rse::cpu {
 // storage and wait states. Implementations return little-endian numeric values.
 class Arm7Bus {
 public:
+    // A clocked bus can suspend an access and remember earlier accesses in the
+    // instruction. On retry it must return their original values and avoid
+    // repeating their side effects.
+    struct Stall {};
     virtual ~Arm7Bus() = default;
     virtual std::uint32_t fetch_arm(std::uint32_t address) = 0;
     virtual std::uint16_t fetch_thumb(std::uint32_t address) = 0;
@@ -47,6 +51,8 @@ public:
     const Arm7State& state() const noexcept { return state_; }
     void reset() noexcept { state_ = {}; }
     void step();
+    // Restore the instruction-boundary registers if the bus suspends the step.
+    [[nodiscard]] bool step_with_stalls();
     // Counts step boundaries, including IRQ entry. Zero performs no work.
     void run(std::uint64_t steps);
     // Level sampled before fetch. Taking IRQ leaves the external level asserted.

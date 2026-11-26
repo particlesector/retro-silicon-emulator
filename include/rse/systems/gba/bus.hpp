@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 #pragma once
+#include "display.hpp"
+#include "timers.hpp"
 #include <rse/cpu/arm7tdmi.hpp>
 #include <array>
+#include <map>
 #include <optional>
 #include <span>
 #include <vector>
@@ -20,7 +23,15 @@ struct EntryFetch {
     bool operator==(const EntryFetch&) const = default;
 };
 
-// Owns GBA media, address decoding and the boot-time LCD, DMA and IRQ logic.
+enum class TimingKind { vblank_enter, frame, vblank_exit, timer_overflow, dma_start, dma_complete, irq_acknowledge };
+struct TimingEvent {
+    std::uint64_t tick;
+    TimingKind kind;
+    unsigned value{}; // Timer or DMA channel, or the bits cleared by IF acknowledgement.
+    bool operator==(const TimingEvent&) const = default;
+};
+
+// Owns GBA media and address decoding and clocks the board peripherals.
 // CPU access methods use aligned addresses for halfwords and words. Each
 // access advances elapsed master ticks, including the selected memory waits.
 class Bus final : public cpu::Arm7Bus {
@@ -32,9 +43,19 @@ public:
     [[nodiscard]] bool irq() const noexcept { return ime_ && wake(); }
     [[nodiscard]] bool halted() const noexcept { return halted_ && !wake(); }
     [[nodiscard]] bool dma_pending() const noexcept;
-    // Run one DMA read/write pair, or idle a halted CPU to the next LCD event.
-    void step_dma();
+    // Run one DMA read/write pair, pausing at the limit when needed.
+    void step_dma(std::uint64_t limit = Timers::never);
     void idle_to_lcd_event();
+    void idle(std::uint64_t limit);
+    void schedule_keys(std::uint64_t tick, std::uint16_t pressed);
+    const Display& display() const noexcept { return display_; }
+    // Optional synchronous timing observer. It must neither reenter the bus
+    // nor modify the emulated machine. Reset preserves the observer.
+    using TimingSink = void (*)(void*, TimingEvent) noexcept;
+    void set_timing_sink(TimingSink sink, void* context) noexcept { sink_ = sink; sink_context_ = context; }
+    // Machine-owned CPU continuation across exact host tick boundaries.
+    void begin_cpu_attempt(std::uint64_t limit) noexcept;
+    void complete_cpu_attempt() noexcept;
     void advance_irq_entry() { advance(1); }
     void branch() noexcept override { previous_ = {}; }
 
@@ -63,6 +84,12 @@ private:
         bool pending{};
         Sequence reads{}, writes{};
     };
+    enum class DmaPhase { startup, read, write };
+    struct DmaTransfer {
+        unsigned channel{}, clocks{};
+        std::uint32_t value{};
+        DmaPhase phase{};
+    };
 
     [[nodiscard]] bool wake() const noexcept { return (ie_ & if_) != 0; }
     std::uint32_t fetch(std::uint32_t address, unsigned width);
@@ -74,9 +101,16 @@ private:
     void write_io(unsigned address, std::uint16_t value, std::uint16_t mask);
     void write_dma(unsigned address, std::uint16_t value, std::uint16_t mask);
     void trigger_dma(unsigned timing);
+    void finish_dma_unit(Dma& dma, unsigned channel, unsigned width, std::uint32_t value);
+    void update_key_irq() noexcept;
+    void emit(TimingKind kind, unsigned value = 0) const noexcept;
     unsigned access_ticks(std::uint32_t address, unsigned width, bool sequential) const noexcept;
     unsigned ticks_to_lcd_event() const noexcept;
+    std::uint64_t ticks_to_event() const noexcept;
+    void handle_lcd_event();
     void advance(unsigned ticks);
+    bool consume(unsigned& clocks, std::uint64_t limit);
+    void advance_cpu_access(unsigned clocks);
 
     std::array<std::uint8_t, bios_size> bios_{};
     std::vector<std::uint8_t> rom_;
@@ -87,7 +121,20 @@ private:
     std::array<std::uint16_t, 0x200> io_{};
     std::array<Dma, 4> dma_{};
     std::optional<unsigned> dma_owner_;
+    std::optional<DmaTransfer> dma_transfer_;
+    Display display_;
+    Timers timers_;
+    TimingSink sink_{};
+    void* sink_context_{};
+    std::multimap<std::uint64_t, std::uint16_t> input_;
+    std::uint16_t pressed_{}, keycnt_{};
+    bool key_match_{};
     Sequence previous_{};
+    // ARM7TDMI can issue one fetch and at most sixteen data accesses per instruction.
+    std::array<std::uint32_t, 17> cpu_results_{};
+    unsigned cpu_count_{}, cpu_cursor_{}, cpu_clocks_{};
+    std::uint64_t cpu_limit_{Timers::never};
+    bool cpu_bounded_{};
     std::optional<EntryFetch> entry_fetch_;
     std::uint64_t ticks_{};
     std::uint32_t instruction_address_{}, bios_latch_{}, opcode_latch_{};

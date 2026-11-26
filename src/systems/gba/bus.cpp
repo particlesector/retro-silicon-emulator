@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 #include <rse/systems/gba/bus.hpp>
 #include <algorithm>
+#include <cassert>
 #include <stdexcept>
 
 namespace rse::gba {
 namespace {
-constexpr unsigned line_ticks = 1232, hblank_tick = 1006, frame_lines = 228;
 constexpr unsigned dma_start = 0xb0, dma_end = 0xe0;
+constexpr unsigned timer_start = 0x100, timer_end = 0x110;
 constexpr std::uint32_t entry = 0x08000000;
 
 std::uint32_t read_le(std::span<const std::uint8_t> bytes, unsigned offset, unsigned width) {
@@ -53,6 +54,13 @@ void Bus::reset() noexcept {
     io_[0] = 0x0080; // Forced blank after power-on.
     dma_.fill({});
     dma_owner_.reset();
+    dma_transfer_.reset();
+    display_.reset();
+    timers_ = {};
+    input_.clear();
+    pressed_ = keycnt_ = 0;
+    key_match_ = false;
+    complete_cpu_attempt();
     branch();
     entry_fetch_.reset();
     ticks_ = 0;
@@ -87,25 +95,67 @@ unsigned Bus::ticks_to_lcd_event() const noexcept {
     return (dot_ < hblank_tick ? hblank_tick : line_ticks) - dot_;
 }
 
+std::uint64_t Bus::ticks_to_event() const noexcept {
+    std::uint64_t next = ticks_to_lcd_event();
+    if (timers_.next_overflow() != Timers::never) next = std::min(next, timers_.next_overflow() - ticks_);
+    if (!input_.empty()) next = std::min(next, input_.begin()->first - ticks_);
+    return next;
+}
+
+void Bus::emit(TimingKind kind, unsigned value) const noexcept {
+    if (sink_) sink_(sink_context_, {ticks_, kind, value});
+}
+
+void Bus::handle_lcd_event() {
+    const auto stat = io_[2];
+    if (dot_ == hblank_tick) {
+        if (line_ < screen_height) {
+            display_.draw(line_, io_, vram_, palette_, oam_);
+            trigger_dma(2);
+        }
+        if (stat & 0x10) if_ |= 2;
+        return;
+    }
+    dot_ = 0;
+    line_ = (line_ + 1) % frame_lines;
+    if (line_ == screen_height) {
+        emit(TimingKind::vblank_enter);
+        display_.publish();
+        emit(TimingKind::frame);
+        if (stat & 8) if_ |= 1;
+        trigger_dma(1);
+    } else if (line_ == frame_lines - 1) {
+        emit(TimingKind::vblank_exit);
+    } else if (line_ == 0) {
+        display_.begin_frame(io_);
+    }
+    if (line_ == (stat >> 8) && (stat & 0x20)) if_ |= 4;
+}
+
 void Bus::advance(unsigned ticks) {
-    while (ticks >= ticks_to_lcd_event()) {
-        const auto span = ticks_to_lcd_event();
+    auto next = ticks_to_event();
+    while (ticks >= next) {
+        const auto lcd = ticks_to_lcd_event();
+        const auto span = unsigned(next);
         ticks -= span;
         ticks_ += span;
         dot_ += span;
-        const auto stat = io_[2];
-        if (dot_ == hblank_tick) {
-            if (stat & 0x10) if_ |= 2;
-            if (line_ < 160) trigger_dma(2);
-        } else {
-            dot_ = 0;
-            line_ = (line_ + 1) % frame_lines;
-            if (line_ == 160) {
-                if (stat & 8) if_ |= 1;
-                trigger_dma(1);
+        // Peripheral edges precede a bus access completing on the same tick.
+        if (span == lcd) handle_lcd_event();
+        if (timers_.next_overflow() != Timers::never && timers_.next_overflow() == ticks_) {
+            const auto wrapped = timers_.overflow(ticks_);
+            for (unsigned timer = 0; timer < 4; ++timer) {
+                if (!(wrapped & (1u << timer))) continue;
+                emit(TimingKind::timer_overflow, timer);
+                if (timers_.irq_enabled(timer)) if_ |= std::uint16_t(8u << timer);
             }
-            if (line_ == (stat >> 8) && (stat & 0x20)) if_ |= 4;
         }
+        while (!input_.empty() && input_.begin()->first == ticks_) {
+            pressed_ = input_.begin()->second;
+            input_.erase(input_.begin());
+            update_key_irq();
+        }
+        next = ticks_to_event();
     }
     ticks_ += ticks;
     dot_ += ticks;
@@ -113,14 +163,59 @@ void Bus::advance(unsigned ticks) {
 }
 
 void Bus::idle_to_lcd_event() { advance(ticks_to_lcd_event()); }
+void Bus::idle(std::uint64_t limit) { advance(unsigned(std::min(ticks_to_event(), limit - ticks_))); }
+
+void Bus::schedule_keys(std::uint64_t tick, std::uint16_t pressed) {
+    if (tick <= ticks_ || pressed > 0x3ff) throw std::invalid_argument("Invalid GBA keypad event");
+    input_.emplace(tick, pressed);
+}
+
+void Bus::update_key_irq() noexcept {
+    const auto selected = keycnt_ & 0x3ff;
+    const auto active = pressed_ & selected;
+    const bool matches = (keycnt_ & 0x4000) && selected &&
+                         ((keycnt_ & 0x8000) ? active == selected : active != 0);
+    if (matches && !key_match_) if_ |= 0x1000;
+    key_match_ = matches;
+    if (wake()) halted_ = false;
+}
+
+bool Bus::consume(unsigned& clocks, std::uint64_t limit) {
+    const auto span = unsigned(std::min<std::uint64_t>(clocks, limit - ticks_));
+    advance(span);
+    clocks -= span;
+    return clocks == 0;
+}
+
+void Bus::begin_cpu_attempt(std::uint64_t limit) noexcept {
+    cpu_cursor_ = 0;
+    cpu_limit_ = limit;
+    cpu_bounded_ = limit != Timers::never || cpu_count_ != 0 || cpu_clocks_ != 0;
+}
+
+void Bus::complete_cpu_attempt() noexcept {
+    cpu_count_ = cpu_cursor_ = cpu_clocks_ = 0;
+    cpu_limit_ = Timers::never;
+    cpu_bounded_ = false;
+}
+
+void Bus::advance_cpu_access(unsigned clocks) {
+    if (!cpu_bounded_) {
+        advance(clocks);
+        return;
+    }
+    if (cpu_clocks_ == 0) cpu_clocks_ = clocks;
+    if (!consume(cpu_clocks_, cpu_limit_)) throw Arm7Bus::Stall{};
+}
 
 std::uint16_t Bus::read_io(unsigned address) const {
     switch (address) {
     case 0x004:
-        return io_[2] | (line_ >= 160 && line_ < 227 ? 1 : 0) |
+        return io_[2] | (line_ >= screen_height && line_ < frame_lines - 1 ? 1 : 0) |
             (dot_ >= hblank_tick ? 2 : 0) | (line_ == (io_[2] >> 8) ? 4 : 0);
     case 0x006: return std::uint16_t(line_);
-    case 0x130: return 0x03ff; // All keys released.
+    case 0x130: return 0x03ff ^ pressed_;
+    case 0x132: return keycnt_;
     case 0x200: return ie_;
     case 0x202: return if_;
     case 0x204: return waitcnt_;
@@ -130,6 +225,7 @@ std::uint16_t Bus::read_io(unsigned address) const {
             const unsigned reg = address - dma_start;
             return reg % 12 == 10 ? dma_[reg / 12].control : 0;
         }
+        if (address >= timer_start && address < timer_end) return timers_.read(address - timer_start, ticks_);
         return io_[address / 2];
     }
 }
@@ -144,8 +240,17 @@ void Bus::write_io(unsigned address, std::uint16_t value, std::uint16_t mask) {
         break;
     }
     case 0x006: case 0x130: break;
+    case 0x132:
+        keycnt_ = merge(keycnt_) & 0xc3ff;
+        update_key_irq();
+        break;
     case 0x200: ie_ = merge(ie_) & 0x3fff; break;
-    case 0x202: if_ &= ~(value & mask); break;
+    case 0x202: {
+        const auto cleared = if_ & value & mask;
+        if_ &= ~cleared;
+        if (cleared) emit(TimingKind::irq_acknowledge, cleared);
+        break;
+    }
     case 0x204: waitcnt_ = merge(waitcnt_) & 0x5fff; break;
     case 0x208: ime_ = (merge(ime_) & 1) != 0; break;
     case 0x300:
@@ -156,7 +261,12 @@ void Bus::write_io(unsigned address, std::uint16_t value, std::uint16_t mask) {
         break;
     default:
         if (address >= dma_start && address < dma_end) write_dma(address, value, mask);
-        else io_[address / 2] = merge(io_[address / 2]);
+        else if (address >= timer_start && address < timer_end) timers_.write(address - timer_start, value, mask, ticks_);
+        else {
+            io_[address / 2] = merge(io_[address / 2]);
+            if ((address >= 0x28 && address <= 0x2e) || (address >= 0x38 && address <= 0x3e))
+                display_.write_reference(address, io_);
+        }
         break;
     }
     if (wake()) halted_ = false;
@@ -234,17 +344,25 @@ void Bus::write_data(std::uint32_t address, unsigned width, std::uint32_t value)
 }
 
 std::uint32_t Bus::read(std::uint32_t address, unsigned width, Access kind) {
+    if (cpu_cursor_ < cpu_count_) return cpu_results_[cpu_cursor_++];
     const bool cart_byte = width == 1 && address >= entry && address < 0x0e000000;
     const auto beat = cart_byte ? address & ~1u : address;
     const auto duration = access_ticks(address, width, previous_.follows(beat, kind));
+    advance_cpu_access(duration);
     previous_ = {beat, cart_byte ? 2u : width, kind};
-    advance(duration);
-    return read_data(address, width, instruction_address_ < bios_size);
+    const auto value = read_data(address, width, instruction_address_ < bios_size);
+    if (cpu_bounded_) {
+        assert(cpu_count_ < cpu_results_.size());
+        cpu_results_[cpu_count_++] = value;
+        ++cpu_cursor_;
+    }
+    return value;
 }
 
 std::uint32_t Bus::fetch(std::uint32_t address, unsigned width) {
-    const auto tick = ticks_;
     instruction_address_ = address;
+    if (address == entry && !entry_fetch_)
+        entry_fetch_ = EntryFetch{ticks_, read_data(address, width, false), width};
     const auto opcode = read(address, width, Access::fetch);
     opcode_latch_ = width == 4 ? opcode : opcode * 0x10001;
     if (address < bios_size) {
@@ -252,14 +370,22 @@ std::uint32_t Bus::fetch(std::uint32_t address, unsigned width) {
         const auto ahead = std::min((address + 2 * width) & ~3u, std::uint32_t(bios_size - 4));
         bios_latch_ = read_le(bios_, ahead, 4);
     }
-    if (address == entry && !entry_fetch_) entry_fetch_ = EntryFetch{tick, opcode, width};
     return opcode;
 }
 
 void Bus::write(std::uint32_t address, unsigned width, std::uint32_t value) {
-    advance(access_ticks(address, width, previous_.follows(address, Access::store)));
+    if (cpu_cursor_ < cpu_count_) {
+        ++cpu_cursor_;
+        return;
+    }
+    advance_cpu_access(access_ticks(address, width, previous_.follows(address, Access::store)));
     previous_ = {address, width, Access::store};
     write_data(address, width, value);
+    if (cpu_bounded_) {
+        assert(cpu_count_ < cpu_results_.size());
+        ++cpu_count_;
+        ++cpu_cursor_;
+    }
 }
 
 std::uint32_t Bus::fetch_arm(std::uint32_t address) { return fetch(address, 4); }
@@ -311,33 +437,54 @@ void Bus::trigger_dma(unsigned timing) {
 }
 
 bool Bus::dma_pending() const noexcept {
-    return std::ranges::any_of(dma_, [](const Dma& channel) { return channel.pending; });
+    return dma_transfer_ || std::ranges::any_of(dma_, [](const Dma& channel) { return channel.pending; });
 }
 
-void Bus::step_dma() {
-    const auto selected = std::ranges::find_if(dma_, [](const Dma& channel) { return channel.pending; });
-    if (selected == dma_.end()) return;
-    auto& dma = *selected;
-    const unsigned channel = unsigned(selected - dma_.begin());
+void Bus::step_dma(std::uint64_t limit) {
+    if (!dma_transfer_) {
+        const auto selected = std::ranges::find_if(dma_, [](const Dma& channel) { return channel.pending; });
+        if (selected == dma_.end()) return;
+        const unsigned channel = unsigned(selected - dma_.begin());
+        const bool switching = dma_owner_ != channel;
+        dma_transfer_ = DmaTransfer{channel, switching ? 2u : 0u, 0, DmaPhase::startup};
+        if (switching) {
+            branch();
+            selected->reads = selected->writes = {};
+            dma_owner_ = channel;
+            emit(TimingKind::dma_start, channel);
+        }
+    }
+    auto& transfer = *dma_transfer_;
+    auto& dma = dma_[transfer.channel];
     const unsigned width = (dma.control & 0x0400) ? 4 : 2;
+    const auto source = dma.current_source, destination = dma.current_destination;
+    if (transfer.phase == DmaPhase::startup) {
+        if (!consume(transfer.clocks, limit)) return;
+        transfer.phase = DmaPhase::read;
+        transfer.clocks = access_ticks(source, width, dma.reads.follows(source, Access::load));
+    }
+    if (transfer.phase == DmaPhase::read) {
+        if (!consume(transfer.clocks, limit)) return;
+        transfer.value = read_data(source, width, false);
+        transfer.phase = DmaPhase::write;
+        transfer.clocks = access_ticks(destination, width, dma.writes.follows(destination, Access::store));
+    }
+    if (!consume(transfer.clocks, limit)) return;
+    const auto finished = transfer;
+    dma_transfer_.reset();
+    finish_dma_unit(dma, finished.channel, width, finished.value);
+}
+
+void Bus::finish_dma_unit(Dma& dma, unsigned channel, unsigned width, std::uint32_t value) {
     const auto source = dma.current_source, destination = dma.current_destination;
     const unsigned dest_mode = (dma.control >> 5) & 3;
     const unsigned source_mode = (dma.control >> 7) & 3;
-    const bool new_owner = dma_owner_ != channel;
-    if (new_owner) {
-        branch();
-        dma.reads = dma.writes = {};
-        dma_owner_ = channel;
-        advance(2);
-    }
-    advance(access_ticks(source, width, dma.reads.follows(source, Access::load)));
-    const auto value = read_data(source, width, false);
-    advance(access_ticks(destination, width, dma.writes.follows(destination, Access::store)));
     dma.reads = {source, width, Access::load};
     dma.writes = {destination, width, Access::store};
     dma.current_source = next_dma_address(source, source_mode, width);
     dma.current_destination = next_dma_address(destination, dest_mode, width);
-    if (--dma.remaining == 0) {
+    const bool completed = --dma.remaining == 0;
+    if (completed) {
         dma.pending = false;
         dma_owner_.reset();
         if (dma.control & 0x4000) if_ |= std::uint16_t(0x100u << channel);
@@ -349,6 +496,8 @@ void Bus::step_dma() {
         }
     }
     write_data(destination, width, value);
+    if (completed) emit(TimingKind::dma_complete, channel);
+    if (wake()) halted_ = false;
 }
 
 }

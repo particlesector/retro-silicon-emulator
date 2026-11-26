@@ -75,6 +75,8 @@ int main() {
         invoke({"run",unsupported,"--ticks","120"},4);
         invoke({"run",gba,"--ticks","12","--system","gba","--bios",bios},0,
                "{\"format\":\"rse.session.run.v1\",\"ticks\":12,\"frames\":0}");
+        invoke({"run",gba,"--frames","2","--system","gba","--bios",bios},0,
+               "{\"format\":\"rse.session.run.v1\",\"ticks\":478016,\"frames\":2}");
         invoke({"run",gba,"--ticks","12","--system","gba"},3);
         invoke({"run",valid,"--ticks","12","--bios",bios},3);
     } catch(const std::exception& error) { std::cerr<<error.what()<<'\n'; return 1; }
