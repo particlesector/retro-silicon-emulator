@@ -71,8 +71,9 @@ composite decoder. Emphasis approximately attenuates the other RGB channels.
 Letterboxing
 preserves a 4:3 display ratio at any pixel size; nearest-neighbor sampling is
 used. Only new visible frames or expose/resize events trigger presentation.
-SDL handles Vulkan swapchain recreation; the app requires its `vulkan` backend
-and synchronized presentation (VSync) to avoid tearing.
+SDL handles Vulkan swapchain recreation. The app requires SDL's `vulkan`
+backend and enables VSync by default. Set `SDL_RENDER_VSYNC=0` before
+launch to skip refresh synchronization. This may produce tearing.
 
 The audio source is M6's fixed 48 kHz PCM. A frontend producer thread advances
 the machine in 21,480-master-tick chunks (about 1 ms), sampling current input
@@ -85,7 +86,7 @@ load/reset and pause commands; the core is never accessed concurrently. No
 GPU or event APIs run on the producer. Only this thread requests best-effort
 high priority on Windows; the process and system priorities are unchanged.
 It keeps one latest completed video frame, replacing stale frames while the
-GUI is busy. Rendering remains on the main thread with VSync. Audio generation
+GUI is busy. Rendering remains on the main thread. Audio generation
 therefore continues across refresh, resize and readback waits. Pause/load/reset
 stop the producer before pausing/clearing the stream; resume waits for priming.
 The producer joins before its stream is destroyed, and execution faults are

@@ -65,8 +65,11 @@ and a maximum UI loop gap below 100 ms and within 50 ms of the baseline.
 Confirm the trainer saves a final checkpoint on cooperative stop.
 
 The RTX 5080 repeat uses the same procedure with `--trainer-device cuda` and
-records the driver, CUDA device, contention and any resource limit. The owner
-deferred that hardware check to final M20 acceptance.
+records the driver, CUDA device, contention and any resource limit. The
+[M20 acceptance record](AI_MVP_ACCEPTANCE.md#native-target-workstation)
+reports the native RTX 5080 comparison and F9 resume from the saved
+checkpoint. Its passing quiet-host comparison used `SDL_RENDER_VSYNC=0`
+for both runs.
 
 ## CPU acceptance record
 

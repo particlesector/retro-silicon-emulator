@@ -89,11 +89,11 @@ contracts. Existing Windows/Linux core and desktop support must not regress.
 
 ### M18 — Native model playback
 
-CPU playback is accepted. The owner approved advancing M19 while native RTX
-5080 CUDA validation is pending. CUDA parity remains an M20 release gate.
+CPU playback was accepted before M19. M20 verified the native RTX 5080
+CUDA release gate with the archived trained policy.
 - [x] Export supported policy to ONNX; version/hash model plus preprocessing,
   input/output shapes, action mapping and task metadata. Reject incompatible models.
-- [ ] Optional C++ ONNX Runtime adapter, CPU fallback and tested CUDA provider;
+- [x] Optional C++ ONNX Runtime adapter, CPU fallback and tested CUDA provider;
   no Python runtime needed for playback. Compare inference against training tool
   on fixed inputs with declared tolerances and action-selection semantics.
 - [x] Run real-time and headless autonomous episodes; manual takeover and clean
@@ -111,18 +111,19 @@ CPU playback is accepted. The owner approved advancing M19 while native RTX
 - [x] Verify responsive UI and existing audio/video playback with CPU training active;
   document resource limits or reduced concurrency if contention occurs.
 
-[Desktop workspace and CPU acceptance](AI_WORKSPACE.md). Native RTX 5080
-training contention and CUDA playback parity are deferred to M20.
+[Desktop workspace and CPU acceptance](AI_WORKSPACE.md). See the
+[M20 acceptance record](AI_MVP_ACCEPTANCE.md#native-target-workstation) for
+native RTX 5080 training contention and CUDA playback parity.
 
 ### M20 — MVP release and validation
 [Acceptance record](AI_MVP_ACCEPTANCE.md) and
 [native Ubuntu RTX 5080 handoff](M20_UBUNTU_HANDOFF.md).
 
-- [ ] Execute [AI acceptance](AI_MVP_ACCEPTANCE.md) on native target workstation;
+- [x] Execute [AI acceptance](AI_MVP_ACCEPTANCE.md) on native target workstation;
   preserve existing platform regression and packaging gates.
-- [ ] Document installation, CLI/desktop workflows, task authoring, SDK examples,
+- [x] Document installation, CLI/desktop workflows, task authoring, SDK examples,
   model provenance, third-party licenses and reproducible reference experiment.
-- [ ] Publish measured throughput and limitations, not theoretical scaling claims.
+- [x] Publish measured throughput and limitations.
 
 ## Scope and decisions
 Core stays C++23/Apache-2.0; optional Python, Gymnasium, PyTorch/CUDA and ONNX

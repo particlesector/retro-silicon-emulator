@@ -82,20 +82,25 @@ cmp "$run/headless-cpu.resl" "$run/headless-cuda.resl"
 ```
 
 Require explicit CUDA provider selection, successful parity checks and level
-completion. Match the desktop and headless replay state hashes. Repeat
-desktop policy playback with a controller press before completion and verify
-manual takeover persists across releases until reset.
+completion. Compare the desktop state hash to the headless playback of
+`desktop.resl`, which advances to the same final tick. Repeat desktop policy
+playback with a controller press before completion and verify manual takeover
+persists across releases until reset. If the window is still acquiring focus
+at launch, press F5 to reset and send the controller input immediately afterward.
 
 ## Desktop contention and package endurance
 
 Use the native desktop session and the same display and audio settings for
-both ten-second runs. Confirm the Vulkan device is the RTX 5080. Capture GPU
+both ten-second runs. The native CUDA comparison uses `SDL_RENDER_VSYNC=0`
+for both runs to avoid the measured Vulkan presentation stalls. Use the
+default VSync setting for package endurance. Confirm the Vulkan device is
+the RTX 5080. Capture GPU
 utilization and memory use while playback and training overlap, for example
 with a separate `nvidia-smi dmon` log.
 
 ```bash
-"$build/rse-desktop" "$rom" --workspace --seconds 10 | tee "$run/baseline.log"
-"$build/rse-desktop" "$rom" --workspace --seconds 10 \
+SDL_RENDER_VSYNC=0 "$build/rse-desktop" "$rom" --workspace --seconds 10 | tee "$run/baseline.log"
+SDL_RENDER_VSYNC=0 "$build/rse-desktop" "$rom" --workspace --seconds 10 \
   --trainer-autostart --trainer-python "$py" \
   --trainer-script "$PWD/bindings/python/rse_train.py" --trainer-bridge "$bridge" \
   --trainer-out "$run/trainer" --trainer-profile "$PWD/bindings/python/profiles/signal-run-desktop.json" \
@@ -105,7 +110,10 @@ with a separate `nvidia-smi dmon` log.
 Check the [workspace limits](AI_WORKSPACE.md#acceptance-checks), including
 progress, preview updates, simulated time, starvation and maximum UI gap.
 Verify the CUDA trainer manifest identifies the RTX 5080, exit saves a
-checkpoint at a rollout boundary, and F9 resumes from that checkpoint.
+checkpoint at a rollout boundary, and F9 resumes from that checkpoint. In a
+fresh desktop window with the same trainer configuration, select the saved
+checkpoint with F4 before pressing F9. Verify the resumed manifest names the
+checkpoint and advances beyond its recorded step count.
 
 Extract the Release ZIP with `unzip` or `cmake -E tar xf` to preserve SDL
 symlinks and use its desktop executable for the
