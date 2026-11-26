@@ -13,6 +13,7 @@ from gymnasium import spaces
 import numpy as np
 import stable_baselines3
 from stable_baselines3 import PPO
+from stable_baselines3.common.callbacks import BaseCallback
 import torch
 
 from rse_train import _device, _write_json
@@ -22,6 +23,22 @@ from rse_training import EmulatorEnv, EnvironmentConfig, MemoryRange, MemoryTask
 PROTOCOL = Path(__file__).with_name("profiles") / "signal-run-v1.json"
 MODES = ("memory", "screen", "hybrid")
 HAZARDS = (3, 7)
+
+
+class EpisodeRewards(BaseCallback):
+    """Record completed training episodes against learner steps."""
+
+    def __init__(self, output):
+        super().__init__()
+        self.output = output
+        self.reward = 0.0
+
+    def _on_step(self):
+        self.reward += float(self.locals["rewards"][0])
+        if self.locals["dones"][0]:
+            self.output.write(json.dumps({"step": self.num_timesteps, "reward": self.reward}) + "\n")
+            self.reward = 0.0
+        return True
 
 
 def scripted(position):
@@ -166,12 +183,15 @@ def run(bridge, rom, out, device, baselines_only, build_sha):
                 model = PPO("MultiInputPolicy" if mode == "hybrid" else "MlpPolicy", env,
                             seed=seed, device=device, n_steps=256, batch_size=128,
                             n_epochs=4, policy_kwargs={"net_arch": [64, 64]})
-                model.learn(total_timesteps=protocol["training_steps"])
+                curve_name = f"{mode}-{seed}-rewards.jsonl"
+                with (out / curve_name).open("w", encoding="utf-8") as curve:
+                    model.learn(total_timesteps=protocol["training_steps"], callback=EpisodeRewards(curve))
                 model_path = out / f"{mode}-{seed}.zip"
                 model.save(model_path)
                 evaluation = _evaluate(
                     env, lambda obs, _info, _rng: int(model.predict(obs, deterministic=True)[0]), protocol)
                 record = {"mode": mode, "seed": seed, "training_steps": model.num_timesteps,
+                          "training_rewards": curve_name,
                           "device": str(model.device), "seconds": time.monotonic() - started,
                           "model_sha256": sha256(model_path.read_bytes()).hexdigest(), **evaluation}
             except Exception as error:

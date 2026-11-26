@@ -31,6 +31,14 @@ If the binary SDK lacks kernels for the RTX 5080, build the official source
 release with CUDA 12.8, cuDNN 9, and `CMAKE_CUDA_ARCHITECTURES=120`.
 [CUDA provider requirements](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html)
 
+The Microsoft Linux GPU NuGet package at version 1.22.0 is an alternative
+SDK source. Extract `buildTransitive/native/include/` into the SDK's
+`include/` directory and `runtimes/linux-x64/native/` into `lib/`. If the
+package supplies only `libonnxruntime.so`, create a `libonnxruntime.so.1`
+symlink to it so the dynamic loader can resolve its SONAME. Retain the
+package's notices and verify the CUDA provider's libraries with `ldd`.
+[Microsoft Linux GPU package](https://www.nuget.org/packages/Microsoft.ML.OnnxRuntime.Gpu.Linux/1.22.0)
+
 Use the M17 training environment for export and install `onnx==1.18.0` in it.
 Generate the ROM with `rse-gameplay-tests <output-directory>` if necessary.
 Use one of the trained memory checkpoints from M17 and its recorded digest.
@@ -112,5 +120,5 @@ Ubuntu 24.04 WSL passed 22/22 headless Debug and 24/24 desktop Release
 CTest suites. With the same authored bundle, the Linux CPU player produced
 a byte-identical replay log to Windows.
 
-The trained M17 checkpoint and CUDA provider still need verification on
-the native RTX 5080 workstation.
+The native RTX 5080 run verified CUDA inference and replay using the archived
+trained M17 seed 101 checkpoint. See the [M20 acceptance record](AI_MVP_ACCEPTANCE.md#native-target-workstation).

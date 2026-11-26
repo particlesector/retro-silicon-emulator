@@ -9,8 +9,9 @@ Display::Display(SDL_Window* window) {
     renderer_.reset(SDL_CreateRenderer(window,"vulkan"));
     if (!renderer_) throw std::runtime_error(std::string("Vulkan renderer unavailable: ")+SDL_GetError()+". Install a Vulkan-capable graphics driver.");
     if (std::string_view(backend())!="vulkan") throw std::runtime_error("Vulkan renderer was not selected");
-    // The audio producer runs independently of this refresh wait.
-    require_sdl(SDL_SetRenderVSync(renderer_.get(),1));
+    // Default to refresh-paced presentation and honor SDL's VSync override.
+    require_sdl(SDL_SetRenderVSync(renderer_.get(),
+        SDL_GetHintBoolean(SDL_HINT_RENDER_VSYNC,true) ? 1 : 0));
 
 }
 void Display::draw(const Frame* frame,bool verify,const WorkspaceOverlay* workspace) {
