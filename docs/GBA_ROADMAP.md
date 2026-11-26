@@ -1,6 +1,6 @@
 # Game Boy Advance roadmap
 
-The GBA has two planned release goals. The `gba` built-in currently supports headless BIOS boot, and `nes-ntsc` remains the default.
+The GBA has two planned release goals. The `gba` built-in supports headless BIOS boot, video and keypad input, and `nes-ntsc` remains the default.
 
 1. **Single-player LeafGreen (M21–M26).** A player earns the Boulder Badge on the Windows and Linux desktop and can continue from the in-game save after relaunch.
 2. **Two-player LAN trading (M27–M30).** Two people on separate computers trade through the games’ cable trading room, one playing FireRed and one playing LeafGreen. Each keeps the received Pokémon in their own save after both emulators restart.
@@ -45,9 +45,13 @@ The recorded tick is for the start of the logical fetch in this model. Full ARM 
 
 ### M23 · Display, timing and keypad
 
-- [ ] The headless `gba` session advertises 240×160 video, 3:2 aspect and ten named buttons. A fixture checks the pressed and released state of every button, including simultaneous presses, at specified ticks.
-- [ ] Timing fixtures check VBlank entry and exit, timer overflow, IRQ acknowledgement and DMA arbitration. At coincident events, compare the ordered trace against a specified expectation. Consecutive frame publications are 280,896 system clocks apart. [LCD timing](https://gbadev.net/gbadoc/graphics.html)
-- [ ] Authored bitmap, tile and sprite scenes check expected pixels, including overlap priority, windows and blending used by the target. A scheduled button press changes a known pixel pattern on the expected frame. Different advance sizes produce identical frame hashes.
+- [x] `gba-keypad` checks 240×160 video, 3:2 aspect and ten named actions. An authored ARM fixture samples KEYINPUT on fixed ticks and compares every pressed and released bit, including a three-button chord. It also checks equal-tick precedence, reset, and keypad IRQ conditions.
+- [x] `gba-timing` compares an ordered trace at tick 197,120. VBlank entry and frame publication precede the Timer 0 overflow and Timer 1 cascade, then DMA 0 transfers before DMA 1. It checks IF acknowledgement, VBlank exit at tick 279,664 and DMA preemption at a transfer boundary. `gba-frame-replay` checks that consecutive publications are 280,896 ticks apart. [LCD timing](https://gbadev.net/gbadoc/graphics.html)
+- [x] `gba-scenes` checks bitmap pages, 4bpp and 8bpp text tiles, affine wrapping, regular and affine sprites, overlap priority, rectangular and OBJ windows, alpha and brightness, and a palette update by HBlank DMA. `gba-frame-replay` checks that scheduled shoulder presses change pixel zero on frame 2 and release restores it on frame 3. Whole-frame and uneven advances produce the same BGR555 FNV-1a hashes `cb8b539a481cde5f`, `6941e3232f2803da`, and `cb8b539a481cde5f`.
+
+The tested implementation is `57ab72d`. Headless CTest passed 30/30 in Debug and Release on Windows x64 with MSVC 19.44 and Ubuntu 24.04 WSL with GCC 13.3. Release builds on both platforms repeated the M22 private cold boots at tick 75,690,221.
+
+The renderer composes one line at HBlank and publishes the completed image at VBlank entry. Mid-scanline register effects, OBJ evaluation cycle limits and physical CPU or video-memory contention still need hardware validation. [GBA hardware reference](https://mgba-emu.github.io/gbatek/)
 
 ### M24 · Desktop play and sound
 
