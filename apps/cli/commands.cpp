@@ -13,15 +13,22 @@ int run(std::span<const std::string_view> args,std::ostream& output,std::ostream
         output<<"Usage: rse-cli --help|--version\n"
               <<"       rse-cli run <rom.nes> --ticks <master-ticks>\n"
               <<"       rse-cli run <rom.nes> --frames <count>\n"
+              <<"       rse-cli run <rom.gba> --ticks <master-ticks> --system gba --bios <bios.bin>\n"
               <<"       Optional: --system nes-ntsc (default)\n";
         return 0;
     }
     if (args.size()==1 && args[0]=="--version") { output<<"Retro Silicon Emulator 0.1.0\n"; return 0; }
     std::string_view system="nes-ntsc";
-    if(args.size()==6 && args[4]=="--system") {system=args[5];args=args.first(4);}
-    if (args.size()!=4 || args[0]!="run" || args[1].empty() || (args[2]!="--ticks" && args[2]!="--frames")) {
+    std::optional<std::string_view> system_option, bios;
+    if (args.size()<4 || args.size()%2 || args[0]!="run" || args[1].empty() || (args[2]!="--ticks" && args[2]!="--frames")) {
         error<<"Invalid arguments. Use --help.\n"; return 2;
     }
+    for (std::size_t i=4; i<args.size(); i+=2) {
+        if (args[i]=="--system" && !system_option) system_option=args[i+1];
+        else if (args[i]=="--bios" && !bios && !args[i+1].empty()) bios=args[i+1];
+        else { error<<"Invalid arguments. Use --help.\n"; return 2; }
+    }
+    system=system_option.value_or(system);
     if (args[3].empty()) { error<<"Count is required.\n"; return 2; }
     std::uint64_t count{};
     const auto parsed=std::from_chars(args[3].data(),args[3].data()+args[3].size(),count);
@@ -29,7 +36,7 @@ int run(std::span<const std::string_view> args,std::ostream& output,std::ostream
         error<<"Count must be an unsigned decimal integer within 64-bit range.\n"; return 2;
     }
     std::unique_ptr<session::Session> machine;
-    try { machine=session::load(system,std::filesystem::path(args[1])); }
+    try { machine=session::load(system,std::filesystem::path(args[1]),std::filesystem::path(bios.value_or(""))); }
     catch(const std::invalid_argument& e) { error<<e.what()<<'\n'; return 3; }
     catch(const std::runtime_error& e) { error<<e.what()<<'\n'; return 5; }
     catch(const std::exception& e) { error<<e.what()<<'\n'; return 6; }

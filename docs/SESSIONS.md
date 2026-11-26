@@ -3,7 +3,8 @@
 The internal C++ application boundary is [Session](../include/rse/session/session.hpp).
 It is source-level code, not a plugin ABI, serialized state format or universal
 chip interface. `rse_session` has no system, SDL3 or Vulkan dependency. The
-`rse_nes_session` adapter and `rse_builtin_sessions` factory are headless libraries.
+`rse_nes_session` and `rse_gba_session` adapters and the `rse_builtin_sessions`
+factory are headless libraries.
 CLI, desktop and audio-only playback use this boundary through the built-in factory.
 
 ## Contract
@@ -63,10 +64,28 @@ allocated event timeline; callers bound future-event volume. No extra frame FIFO
 is introduced. The accepted approximate RGB palette/emphasis conversion is shared
 by the adapter and existing desktop wrapper; this is not an analog decoder.
 
+## GBA boot built-in
+
+`session::load("gba", cartridge_path, bios_path)` loads external media and starts
+the ARM7TDMI at the BIOS reset vector. The BIOS must be exactly 16 KiB. The
+loader checks the cartridge size against the 192-byte header minimum and
+32 MiB ROM capacity. The header has no field for the full dump length.
+Use `session::create("gba", cartridge_bytes, bios_bytes)` for authored fixtures.
+Construct the replacement session before releasing the current one so media
+errors leave the current session available.
+
+The adapter reports a 16,777,216 Hz clock and supports headless tick stepping.
+The board executes in whole instruction and DMA transfer units. The
+`gba::Session::entry_fetch()` diagnostic returns the width, opcode and starting
+tick of the first logical fetch at `0x08000000` after execution reaches that
+access. See the [M22 verification](GBA_ROADMAP.md#m22--gba-memory-map-and-bios-boot)
+for timing scope and the private boot procedure.
+
 ## Application integration
 
-The default system remains `nes-ntsc`. CLI and desktop accept an optional
-`--system nes-ntsc`; unknown IDs fail explicitly before media/device access.
+The default system remains `nes-ntsc`. The CLI accepts `--system gba --bios <path>`
+with `--ticks` for headless GBA boot. Desktop playback uses `nes-ntsc`.
+Unknown IDs fail explicitly before media/device access.
 The CLI option follows the existing run/count arguments. Existing NES commands,
 exit codes and `rse.run.v1` JSON retain their meanings; `apps/cli/nes_output.hpp`
 owns chip-specific formatting. Generic execution drains discarded PCM in bounded

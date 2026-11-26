@@ -286,7 +286,8 @@ void inspection_contract() {
 }
 void nes_contract(const std::filesystem::path& file) {
     const auto image=rse::acceptance::image(rse::acceptance::av_input_program());
-    check(api::builtin_ids().size()==1 && api::builtin_ids()[0]=="nes-ntsc","built-in IDs");
+    check(api::builtin_ids().size()==2 && api::builtin_ids()[0]=="nes-ntsc" && api::builtin_ids()[1]=="gba",
+          "built-in IDs");
     auto session=api::create("nes-ntsc",image);
     const auto& info=session->info();
     check(info.id=="nes-ntsc" && info.clock_hz==api::Rational{236250000,11},"NES clock metadata");
