@@ -1,165 +1,19 @@
-# Retro Silicon Emulator architecture
+# Architecture
 
-## Goals
-Build an accurate NES emulator first, with a reusable component-based C++23 core suitable for future historical and experimental machines. Support deterministic headless tests and comparison with Retro Silicon FPGA traces.
+| Layer | Owns | Entry points |
+| --- | --- | --- |
+| Core and chips | Integer simulation time, lifecycle, CPU and peripheral state, bus transactions | [Core](../include/rse/core), [CPU](../include/rse/cpu), [video](../include/rse/video), [audio](../include/rse/audio) |
+| System | Chip selection, memory map, clock conversion, reset, interrupt and DMA routing | [NES model and headless CLI](NES_SYSTEM.md) |
+| Session | Built-in machine selection, bounded execution, timestamped input, completed frames and PCM | [Machine sessions](SESSIONS.md), [inspection and automation](AUTOMATION.md) |
+| Applications | CLI reporting, SDL3 input/audio, Vulkan presentation and host pacing | [Desktop controls and packages](DESKTOP.md) |
+| Optional learning tools | Gymnasium environments, task rewards, checkpoints and policy inference | [Training and playback](TRAINING_SDK.md) |
 
-Historical preservation, experimental computer construction and AI-enabled
-observation/control are complementary long-term goals. The NES is the first concrete product; Apple IIe and
-custom machines should reuse chip models with explicit adapters and machine-owned
-wiring. See [Project vision](VISION.md) for the fuller product direction, component
-compatibility, workbench, diagnostics, and FPGA verification goals. The
-[Roadmap](ROADMAP.md) records the accepted MVP baseline and current milestone scope.
+## Time and ownership
 
-## Layers
-- `rse_core`: platform-independent components, scheduler, buses, machine lifecycle and state management.
-- `rse_cpu6502`: reusable NMOS 6502 instruction engine with explicit CPU variants,
-  independent of NES memory maps, audio, DMA, and frontend APIs. See
-  [6502 CPU contract](CPU_6502.md).
-- `rse_ppu2c02`: reusable NTSC PPU register, rendering, palette, and OAM model;
-  external memory is supplied by the machine. See [2C02 contract](PPU_2C02.md).
-- `rse_apu2a03`: reusable NTSC 2A03 sound circuitry, channel DAC outputs, IRQ,
-  and sample-reader requests; no console memory or host audio API. A separate
-  integer PCM converter produces 48 kHz source audio. See [APU contract](APU_2A03.md).
-- `rse_devices`: reusable logical peripherals, including the CD4021 shift register,
-  standard controller wiring, and 2A03 OAM/DMC DMA arbitration.
-- `rse_nes` (`systems/nes`): cartridge loading, NES memory mapping, and a Ricoh CPU
-  variant adapter, PPU memory wiring, and an NTSC machine runtime with controller
-  and OAM/DMC DMA, APU IRQ routing, and bounded audio capture. See
-  [NES memory](NES_MEMORY.md) and [system timing and execution](NES_SYSTEM.md).
-- `rse-cli`: headless execution, tracing, snapshots and differential testing (planned).
-- `rse_session`: internal application contract for metadata, advancement, named
-  input and frame/PCM delivery. `rse_nes_session` adapts the specialized NES
-  runtime; `rse_builtin_sessions` selects built-in machines. These libraries
-  have no SDL3/Vulkan dependency. See [machine sessions](SESSIONS.md).
-- `rse-desktop`: optional SDL3 window/input/audio and Vulkan renderer. A frontend
-  producer advances a single serialized machine independently of GUI/VSync waits;
-  events and GPU work stay on the main thread. See [pacing](DESKTOP.md#presentation-and-pacing).
+The generic machine owns its components and dispatches integer ticks in registration order. Registration closes on the first positive advance. Reset establishes tick zero. Advance processes (current, target], so repeated calls to the same target perform no work. On a callback failure the committed tick stays at the last completed boundary. Components may have partial state and the machine requires a successful reset to resume. [Core interfaces](../include/rse/core/machine.hpp)
 
-## Architectural invariants
-- No SDL3 or Vulkan dependencies in `rse_core`.
-- Machine time is monotonic and represented using integer ticks; cross-domain clock semantics must be defined before implementing NES timing.
-- Component boundaries and bus side effects must be explicit.
-- Reusable parts follow chip-level responsibilities, with explicit variants for
-  hardware differences. Board wiring and clock conversion belong to system models.
-  Preserve tested observable behavior using the least expensive suitable model;
-  profile optimizations and add signal-level detail only where it has verified value.
-- Trace formats will specify clock domain, ordering, schema version and initial state.
-- Hardware and software models are independently implemented; shared tests and specifications provide verification.
+A system with a specialized scheduler defines device phases and equal-time ordering explicitly. For a fixed initial state and input timeline, changing caller step sizes must preserve state and outputs. Chip models own observable behavior. Board wiring, address decoding and host file paths stay outside reusable CPUs and peripherals.
 
-## System and application boundaries
+Applications own threads, queues, windows and devices. The producer copies a published frame before the next mutating session call. Host scheduling sets playback pace while the machine determines simulated time. Built-in systems are statically registered C++ adapters. Inspection, snapshots and training depend on capabilities exposed by each adapter. [Session interfaces](../include/rse/session/session.hpp) · [Built-in factory](../src/session/builtins.cpp)
 
-Machine definitions own device graphs, address decoding, clock ratios/phases,
-reset sequencing, interrupt routing, and DMA arbitration. The M1 registration
-order is a deterministic baseline; it does not establish hardware phase ordering.
-NES integration must define and test that ordering explicitly, including variable
-PPU frame lengths. Do not freeze a scheduler or universal chip API in advance of
-those requirements.
-
-The original NTSC proposal uses a PPU-dot timeline with three dots per CPU cycle
-and explicit rendering-time odd-frame dot skipping. Validate the ratios, phases,
-and skipped-dot handling during NES integration; use a finer master unit if needed
-to represent required edges exactly. Equal-time events need documented phases or
-priorities and a stable tie-breaker, rather than accidental container ordering.
-
-Bus/device contracts must eventually distinguish driven bits from floating bits,
-resolve open-bus values, and identify access timing, ownership, and side effects.
-The CPU bus sees the resolved byte; partially driven device results can be merged
-by the system bus. Side-effect-free inspection must not accidentally clear status
-flags or advance devices. M2's zero-read policy is a documented placeholder.
-
-Desktop and CLI should use common machine-session commands and receive frames,
-audio, diagnostics, and state/trace artifacts through an application boundary.
-The UI must not drive chip internals directly. Keep host callbacks and bounded
-presentation queues outside logical simulation; define backpressure explicitly.
-Version future state/trace formats and validate compatibility before loading.
-
-The common [session boundary](SESSIONS.md#application-integration-m11) is now used
-by CLI, desktop and audio-only playback. Generic production/presentation consume
-metadata and owned RGBA/PCM; default NES controls, smoke fixture inspection and
-legacy CLI formatting remain separate application adapters. Dispatch stays at
-bounded session operations; the specialized machine/chip scheduler is unchanged.
-
-## Implementation boundaries
-The generic runtime provides the [M1 lifecycle contract](CORE_TIMING.md). The NES
-runtime owns master-clock scheduling and has verified headless execution of the
-generated NROM fixtures in [M5](NES_SYSTEM.md). This does not establish broad ROM
-compatibility. [APU/audio](APU_2A03.md) includes deterministic PCM and SDL playback.
-The [desktop](DESKTOP.md) presents through SDL3's Vulkan renderer, loads supported
-cartridges, maps input, and uses PCM consumption to pace a short-lookahead
-producer while presenting its newest completed frame. Verification is
-limited to its documented fixtures, hosts, and renderer readback cases.
-
-## Next milestone
-Follow the [Roadmap](ROADMAP.md) and its acceptance gates for remaining work.
-
-## Simulation fidelity and execution speed
-
-Simulation time is independent of host wall-clock time. A deterministic scheduler owns integer simulated timestamps, ordering of simultaneous events, and synchronization among clock domains. A separate execution controller supports real-time pacing, slow motion, fast-forward, unlimited throughput, pause, and stepping by instruction, CPU cycle, PPU dot, scanline, frame, or selected event.
-
-Three *capabilities*, not universally interchangeable runtime switches, are envisioned:
-- Functional models: preserve required externally observable behavior with fewer intermediate events.
-- Cycle-accurate models: preserve defined bus transactions, interrupt, DMA, and device timing at documented boundaries.
-- Optional signal-level models: resolve pins, multi-bit buses, clock edges, tri-state contention, and propagation semantics for educational and diagnostic use.
-
-The NES is the first cycle-accurate target; Ben Eater-style SAP and W65C02 breadboard systems are later modularity demonstrations. Saturn and N64 are long-term targets with substantially greater multi-processor, memory, and graphics synchronization requirements. Model capabilities and state-transfer compatibility must be declared explicitly; switching fidelity mid-run is not assumed safe.
-
-## Hybrid CPU/GPU acceleration
-
-The scheduler remains the sole authority for **simulated** hardware time. Vulkan is optional and must not become a dependency of the platform-independent core. A compute-backend abstraction may allow selected components to delegate expensive, sufficiently independent workloads to CPU or Vulkan compute implementations.
-
-Good candidates include N64 RDP-like rasterization, selected Saturn VDP workloads, parallel signal batches, and offline trace comparisons. CPU instruction sequencing, tightly coupled bus arbitration, DMA, and interrupt coordination initially remain CPU-side. GPU dispatch, synchronization, and readback overhead can exceed the savings for fine-grained work; benchmark before introducing acceleration.
-
-An accelerated job consumes an explicitly versioned input/state snapshot and produces results with a defined simulated completion event. Host GPU completion time must **never** determine emulated completion time. The host waits when results are required; GPU work cannot race with observable reads/writes or change event order. Record memory visibility, side effects, and synchronization points precisely.
-
-### Proposed interfaces (design only)
-
-- `IComputeBackend`: backend identity, capability metadata, submission and completion/error reporting.
-- `ComputeJob`: immutable input snapshot, operation kind, deterministic parameters, and required simulated completion timestamp.
-- `ComputeResult`: output/state delta, error/status, and trace correlation identifier.
-- `IHardwareModel`: documented observable timing and optional backend selection; CPU reference implementation is the baseline.
-
-Do not force all hardware models into a generic GPU kernel interface. The backend boundary should exist only where it offers measurable value.
-
-### Verification requirements
-
-1. Reference CPU backend and accelerated backend share behavioral conformance tests.
-2. Compare timestamped bus transactions, interrupt/DMA behavior, output hashes, and relevant state checkpoints against reference traces.
-3. Include cases with mid-frame register writes, memory contention, readbacks, interrupts, and state save/restore.
-4. Preserve reproducible results across supported hardware/drivers where the backend claims deterministic operation; explicitly document unsupported cases.
-5. Provide a reference-only verification mode and a separately documented performance mode. Rendering accuracy alone is not evidence of cycle-accurate device timing.
-6. Track host throughput separately from simulated cycles, and profile CPU/GPU synchronization overhead.
-
-### Incremental roadmap
-
-- NES: deterministic CPU scheduler, bus semantics, cycle/dot tracing, and headless FPGA comparison. Vulkan initially handles presentation only.
-- Educational machines: optional signal-level components and inspectable wiring without slowing ordinary chip-level execution.
-- Advanced consoles: first establish CPU reference models and exact device timing contracts; profile hotspots; accelerate suitable graphics/compute operations behind validated backends.
-- Only consider generalized GPU signal simulation if measured workloads justify it.
-
-## Accuracy boundaries
-
-Cycle accuracy is always relative to a **named observation boundary** (for example CPU bus cycles, PPU dots, DMA events, or chip pins). It does not imply transistor-level or analog accuracy. FPGA trace comparison requires matched initial state, clock-domain mapping, input events, and documented handling of undefined hardware behavior.
-
-## Observation, automation and AI (proposed M12–M20)
-
-Extend sessions through optional capability interfaces, not universal chip APIs.
-Machine adapters publish typed memory/register/signal metadata and non-mutating
-inspection; distinguish peeks from side-effecting bus reads. Observe at documented
-clock phases/events with stable sequence order. Disabled subscriptions should
-add negligible measured overhead. Batch/delta encode data, bound queues and
-report loss; lossless consumers block only at safe execution boundaries or fail.
-
-Session ownership remains serialized; agents submit named timestamped inputs,
-reset/step/run commands, never direct chip mutations. Full versioned snapshots
-and action replay preserve logical determinism independently of host/GPU timing.
-Parallel sessions own separate state; an optional worker pool batches observations
-and actions. Optional Python bindings/Gymnasium and PyTorch/CUDA trainer sit above
-the session boundary; task reward/termination and preprocessing are separate from
-hardware. Optional ONNX Runtime inference serves native C++ playback. Desktop
-telemetry is bounded and trainer work never runs on the UI/audio callback thread.
-Neither CUDA nor Python is required to build the core or ordinary emulator.
-
-See [AI MVP roadmap](AI_MVP_ROADMAP.md) and [acceptance](AI_MVP_ACCEPTANCE.md)
-for implementation gates. GPU learning is not GPU hardware emulation; no model
-completion time determines simulated hardware timing. Recorded actions, not
-training algorithm bitwise determinism, are the replay contract.
+Design new abstractions around a demonstrated machine requirement. The GBA introduces firmware alongside cartridge media and a persistent flash device. The planned ownership and acceptance tests are in the [GBA roadmap](GBA_ROADMAP.md).

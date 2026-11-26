@@ -1,41 +1,35 @@
-# NES system integration (M5)
+# NTSC NES
 
-## Clock, ownership, and access contract
+## Supported cartridges
 
-The NES machine owns chip wiring; the 6502, 2C02, controller shift register,
-and OAM DMA remain separate components. A machine tick is one NTSC master-clock
-period. PPU clocks occur every four ticks, CPU slots every twelve. Default phase
-zero clocks first at ticks 4/12; configurable phases select other integer offsets.
-This fixes reproducibility without claiming every physical half-cycle alignment.
+`Cartridge::parse` accepts a byte span and owns a copy of accepted data.
+`Cartridge::load_file` reads at most the largest supported image plus one byte;
+both entry points reject truncated and trailing data. Parse failures throw
+`std::invalid_argument` with a reason; file I/O failures throw `std::runtime_error`.
+Loading a new cartridge does not mutate an existing one.
 
-Advance processes (current, target], including events exactly at the target.
-At a shared tick, apply scheduled input/IRQ events in insertion order, clock the
-PPU, route its NMI level and publish frame observations, then clock the CPU/DMA
-slot. CPU register side effects update the NMI wire before CPU pin sampling.
-Odd-frame PPU counter skips do not change this oscillator relationship. Runs can
-stop between device edges and must remain invariant under advancement chunking.
+Accept only clean iNES headers with mapper 0, 16 or 32 KiB PRG ROM, and 8 KiB
+CHR ROM or zero CHR ROM banks (allocating 8 KiB CHR RAM). Only the mirroring
+flag may be set in header byte 6. Reject trainers, battery-backed memory,
+four-screen layouts, other mappers/consoles, NES 2.0, PAL, and nonzero header
+bytes 8-15. No repair of dirty legacy headers or guessing hardware variants.
+Byte 8 zero is treated as unspecified: this supported NROM subset has no PRG RAM.
+Explicit PRG RAM declarations and unofficial header extensions are unsupported.
 
-The reusable CPU bus can deny a read grant while another bus owner performs its
-cycle. CPU clocks and interrupt-pin sampling continue, but the pending read is
-not consumed. Writes cannot be halted. This hook is not NES address decoding.
-OAM DMA halts the next CPU read after $4014, optionally aligns to a get phase,
-then performs 256 get/put pairs. All accesses use the ordinary mapped bus, including
-halt/alignment repeats and $2004 writes. Consecutive $4014 writes select the last
-page before the halt. Get/put power-on phase is a reproducible profile option.
-DMC arbitration and audio are documented in [2A03 APU](APU_2A03.md).
+## Chips and timing
 
-The standard controller uses a separate CD4021 model. Button bits are A, B,
-Select, Start, Up, Down, Left, Right from bit 0 through bit 7. Strobe-high loads
-continuously, strobe-low freezes the sample for serial reads, and exhausted reads
-return one at the CPU port. Physical button pins are active-low and the 4021
-serial input is grounded; the console performs DATA inversion. Host events carry
-explicit future master ticks; equal-tick events
-apply in stable insertion order. External IRQ events exercise the wire without
-pretending NROM has an IRQ source; APU/mapper IRQ sources arrive separately.
+The machine clocks the NTSC 2C02 every four master ticks and the Ricoh CPU every twelve. At coincident ticks it applies scheduled inputs, clocks the PPU, routes NMI and publishes frame observations before the CPU/DMA slot. Reset recreates a deterministic power-on timeline. See the [NES machine](../include/rse/systems/nes/machine.hpp) and [session metadata](SESSIONS.md#nes-built-in).
+
+| Component | Implemented behavior and limits |
+| --- | --- |
+| 6502 | All 151 documented opcodes. The reusable NMOS variant supports decimal arithmetic and the Ricoh 2A03 executes binary arithmetic. A denied read leaves the transaction pending while pins and CPU clocks advance. Unsupported opcodes fault after fetch. [CPU interface](../include/rse/cpu/mos6502.hpp) |
+| 2C02 | The chip owns OAM, palette, dot-level rendering and published indexed frames. The machine supplies CHR and mirrored nametable RAM. Power-on state and display color conversion are deterministic approximations. [PPU interface](../include/rse/video/rp2c02.hpp) |
+| APU and DMA | Pulse, triangle, noise and DMC feed deterministic 48 kHz mono PCM. The system arbitrates DMC and OAM DMA on the CPU bus and routes APU IRQ. Capture and drain PCM regularly when enabled. [APU interface](../include/rse/audio/rp2a03_apu.hpp) |
+| Input | One standard controller latches eight buttons through its shift register. Input events carry future master ticks. Equal-time events preserve insertion order. |
 
 ## CPU memory and observation
 
-CPU RAM and NROM retain the M2 map. $2000-$3FFF mirrors native PPU registers;
+2 KiB of CPU RAM mirrors across $0000–$1FFF. NROM PRG maps at $8000–$FFFF. $2000-$3FFF mirrors native PPU registers;
 $4014 requests OAM DMA and $4016 strobes/reads controller 1. Unconnected controller
 port 2 drives zero on its low lines. Unmapped reads retain the CPU bus latch;
 controller reads use NES-001 wiring: bits 0-4 driven, latched high bits retained.
@@ -50,53 +44,7 @@ diagnostic records, not a frozen trace-file ABI or serialized machine state.
 On execution/trace errors, the machine faults; partial work is not rolled back.
 Reset reconstructs a deterministic power-on timeline for the same cartridge and
 profile, clears queues/traces/RAM/chip state, and releases controller buttons.
-It is not a hardware warm-reset pin model. Existing M4 PPU limits still apply.
-
-## Reference plan and acceptance cases
-
-References: NESdev [DMA](https://www.nesdev.org/wiki/DMA),
-[standard controller](https://www.nesdev.org/wiki/Standard_controller),
-[controller ports](https://www.nesdev.org/wiki/Controller_reading), and
-[PPU clock relationship](https://www.nesdev.org/wiki/PPU).
-The logical 4021 behavior follows the [TI CD4021B specification](https://www.ti.com/product/CD4021B).
-Use project-owned generated NROM programs and fixed expected values, not game ROMs.
-
-- Chip cases: 4021 parallel load/serial input and controller button order, held
-  strobe, falling-edge capture, changing live buttons, and reads beyond eight bits.
-- CPU arbitration: denied read repeats without register/PC advancement, continuing
-  pin sampling and timestamps, and rejection of attempted write halts. Existing
-  instruction reference suites must remain unchanged and pass.
-- DMA cases: both 513/514-slot alignments, all 256 source reads and OAM writes,
-  OAM wrapping, write-delayed halt/last-page selection, side-effecting halt reads,
-  continued PPU time, and NMI latched while CPU execution is held.
-- System cases: clock/phase counts, register mirrors, open bus, timestamped input,
-  NMI/IRQ priority and delivery, reset/failure behavior, and runs stopped mid-slot.
-- Fixed-duration programs: repeat and chunk identical input timelines; compare
-  CPU/PPU/RAM observations, ordered event hashes, and frame hashes. Pin expectations
-  independently from simple loop arithmetic and explicitly assembled fixture code.
-
-## Deterministic fixtures
-
-`nes-system-tests` runs a generated NROM loop for 720,089 master ticks. An
-independent oracle constructs its reset sequence and 7,500 complete INC/JMP
-iterations: 60,007 CPU slots, RAM $10 = $4C, PC = $8000, and two published frames.
-FNV-1a hashes encode each numeric field, including frame palette samples, as
-eight little-endian bytes. Pinned expectations are:
-
-| Observation | Hash |
-| --- | --- |
-| Ordered events | `2131961d8dc21ff1` |
-| Machine state | `69f1cb6cc7e11967` |
-| Blank frame | `cf28946e7ff82325` |
-
-A second generated program configures CHR RAM and palette output, then samples
-scheduled controller input in NMI handlers. It checks captured values $A5/$3C,
-eight serial reads per sample, and a uniform $21 frame. Repeated, reset, and
-chunked runs compare full observations. Fixtures are project-owned source code;
-these checks establish the listed behavior, not broad game compatibility.
-The event oracle includes the APU's power-on four-step frame IRQ at tick 357,936;
-the loop keeps IRQ masked. The video/input fixture also leaves IRQ masked so it
-continues to isolate NMI-driven sampling. Earlier M5 captures predated APU wiring.
+It is not a hardware warm-reset pin model.
 
 ## Headless runner
 
@@ -117,14 +65,10 @@ Success prints one JSON record with format `rse.run.v1`, elapsed master `ticks`,
 `cpu_cycles` (including DMA holds), published `frames`, and decimal `pc`.
 Exit codes: 0 success, 2 arguments, 3 unsupported/malformed cartridge, 4 execution
 failure, 5 cartridge I/O failure, 6 other loading failure. Errors go to stderr.
-Unsupported CPU opcodes fail explicitly. Audio capture/playback is described in
-[2A03 APU](APU_2A03.md); combined video/input playback is documented in
-[Desktop MVP](DESKTOP.md).
+Unsupported CPU opcodes fail explicitly.
 
-## Validation
+See [desktop playback](DESKTOP.md) for audio and video output.
 
-All 12 CTest suites pass in Windows/MSVC Debug and Release builds. Linux Debug,
-Release, and ASan/UBSan with leak detection also pass in
-[CI run 43572558639](https://github.com/particlesector/retro-silicon-emulator/actions/runs/43572558639).
-The CPU reference suites remain unchanged. Configure/build/test checks use the
-frontend-free configuration; desktop execution is outside M5 acceptance.
+## Deterministic regression fixtures
+
+Run CTest after the [platform build](../README.md#build-and-test). `acceptance-fixture-hashes` regenerates the three project-owned NROM fixtures and two rejection cases. `acceptance-replay-tests` checks state, events, frames and PCM across reset and different step sizes. Generate the fixtures with `rse-acceptance-tests --write-set <directory>`. Expected sizes and digests live in the [frozen manifest](../tests/acceptance/manifest.json). For chip-specific observations and the original hardware limits, see the [M20 documentation snapshot](https://github.com/particlesector/retro-silicon-emulator/tree/c592dc7857da82cfceceda64d1fc0e27ded713e0/docs).

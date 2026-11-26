@@ -63,11 +63,12 @@ then run `./build/dev/rse-desktop`.
 
 The Ninja preset also works on Windows from a Visual Studio Developer PowerShell.
 
-See [Architecture](docs/ARCHITECTURE.md) for the project structure and
-[Headless execution](docs/NES_SYSTEM.md#headless-runner) for CLI usage.
-See [Desktop usage and packages](docs/DESKTOP.md) for controls, cartridge loading,
-and Release packaging. [Audio-only playback](docs/APU_2A03.md#desktop-playback)
-is also available.
-Applications default to `nes-ntsc`; use `--system nes-ntsc` to select it explicitly.
-See [MVP verification](docs/MVP_ACCEPTANCE.md) for the frozen test set and support limits.
-Licensed under [Apache-2.0](LICENSE).
+## Project guides
+
+- [Development roadmap and completed milestones](docs/ROADMAP.md)
+- [Game Boy Advance and LeafGreen roadmap](docs/GBA_ROADMAP.md)
+- [Architecture](docs/ARCHITECTURE.md) and [machine sessions](docs/SESSIONS.md)
+- [NES support and CLI](docs/NES_SYSTEM.md) and [desktop controls and packages](docs/DESKTOP.md)
+- [Inspection and automation](docs/AUTOMATION.md) and [training and policy playback](docs/TRAINING_SDK.md)
+
+Applications default to `nes-ntsc`. Licensed under [Apache-2.0](LICENSE).
