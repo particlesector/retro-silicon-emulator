@@ -23,7 +23,7 @@ Each milestone depends on the preceding one and may span several PRs. Before imp
 
 ### M21 · ARM7TDMI execution
 
-- [ ] A project-owned program boots on a test bus, branches from ARM to Thumb and back, writes a hand-calculated RAM signature and reaches the expected final PC. The core builds independently of the GBA system.
+- [x] A project-owned program boots on a test bus, branches from ARM to Thumb and back, writes a hand-calculated RAM signature and reaches the expected final PC. The independent `rse_arm7tdmi` library runs this fixture with ARM immediate MOV, Thumb immediate MOVS and word STR, and register BX in both states. `arm7tdmi-tests` checks the logical fetch/store sequence, the word `0x0000005A` at `0x84`, and final ARM PC `0x44`. Each step executes one instruction. Cycle timing, pipeline fetch traffic and exception handling remain open.
 - [ ] ARM and Thumb instruction cases compare registers, flags and memory against independent expectations. Cover arithmetic and shift carry, conditional branches, pipeline-visible PC, aligned and unaligned transfers, and bus access widths.
 - [ ] Exception tests check the software interrupt and IRQ vectors, banked registers, saved status and return PC. Running the same fixture in one budget and in smaller chunks yields the same state and ordered bus transactions.
 
