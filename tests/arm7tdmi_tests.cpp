@@ -327,6 +327,70 @@ void arm_exception_boundaries() {
     cpu.step();
     check(cpu.state().pc == 8 && cpu.state().cpsr == 0x1f, "ARM IRQ return");
 }
+
+void arm_boot_operations() {
+    Memory memory;
+    const std::uint32_t code[] = {
+        0xe3a000c0, // MOV r0,#0xc0
+        0xe3a01006, // MOV r1,#6
+        0xe3e02000, // MVN r2,#0
+        0xe0030291, // MUL r3,r1,r2
+        0xe0854291, // UMULL r4,r5,r1,r2
+        0xe9200038, // STMDB r0!,{r3-r5}
+        0xe8b001c0, // LDMIA r0!,{r6-r8}
+    };
+    for (unsigned i = 0; i < std::size(code); ++i) memory.put(4 * i, code[i], 4);
+    Arm7Tdmi cpu(memory);
+    cpu.run(5);
+    const auto& regs = cpu.state().registers;
+    check(regs[3] == 0xfffffffau && regs[4] == 0xfffffffau && regs[5] == 5,
+          "MUL truncation and UMULL full product");
+    cpu.step();
+    check(regs[0] == 0xb4, "STMDB decrements base by list size");
+    cpu.step();
+    check(regs[0] == 0xc0 && regs[6] == regs[3] && regs[7] == regs[4] && regs[8] == regs[5],
+          "LDMIA restores words and advances base");
+    const std::vector<Access> expected = {
+        {Operation::arm, 20, code[5]},
+        {Operation::store, 0xb4, 0xfffffffau}, {Operation::store, 0xb8, 0xfffffffau}, {Operation::store, 0xbc, 5},
+        {Operation::arm, 24, code[6]},
+        {Operation::load, 0xb4, 0xfffffffau}, {Operation::load, 0xb8, 0xfffffffau}, {Operation::load, 0xbc, 5},
+    };
+    check(std::vector(memory.trace.begin() + 5, memory.trace.end()) == expected, "block transfer bus order");
+}
+
+void thumb_boot_operations() {
+    Memory memory;
+    memory.put(0, 0xe3a00081, 4);  // MOV r0,#0x81
+    memory.put(4, 0xe3a0d0e0, 4); // MOV sp,#0xe0
+    memory.put(8, 0xe12fff10, 4); // BX r0
+    memory.put(0x80, 0x20c0, 2);  // MOVS r0,#0xc0
+    memory.put(0x82, 0x2301, 2);  // MOVS r3,#1
+    memory.put(0x84, 0x5ec4, 2);  // LDRSH r4,[r0,r3]
+    memory.put(0x86, 0x5ac5, 2);  // LDRH r5,[r0,r3]
+    memory.put(0x88, 0xf000, 2);  // BL 0xa0, prefix
+    memory.put(0x8a, 0xf80a, 2);  // BL 0xa0, suffix
+    memory.put(0xa0, 0xb530, 2);  // PUSH {r4,r5,lr}
+    memory.put(0xa2, 0x2400, 2);  // MOVS r4,#0
+    memory.put(0xa4, 0x2500, 2);  // MOVS r5,#0
+    memory.put(0xa6, 0xbd30, 2);  // POP {r4,r5,pc}
+    memory.put(0xc0, 0x8012, 2);
+    Arm7Tdmi cpu(memory);
+    cpu.run(7);
+    const auto& regs = cpu.state().registers;
+    check(regs[4] == 0xffffff80u && regs[5] == 0x12000080u, "ARM7 signed and unsigned odd halfword loads");
+    check(memory.trace[6] == Access{Operation::load_byte, 0xc1, 0x80} &&
+          memory.trace[8] == Access{Operation::load_half, 0xc0, 0x8012}, "odd loads select the proper bus width");
+    cpu.run(2);
+    check(cpu.state().pc == 0xa0 && regs[14] == 0x8d, "Thumb BL target and link");
+    cpu.step();
+    check(regs[13] == 0xd4 && memory.read(0xd4, 4) == 0xffffff80u &&
+          memory.read(0xd8, 4) == 0x12000080u && memory.read(0xdc, 4) == 0x8d, "Thumb PUSH order");
+    cpu.run(3);
+    check(cpu.state().pc == 0x8c && cpu.state().thumb() && regs[13] == 0xe0 &&
+          regs[4] == 0xffffff80u && regs[5] == 0x12000080u, "Thumb POP restores registers, stack and PC");
+}
+
 void unsupported_encodings() {
     Memory memory;
     Arm7Tdmi cpu(memory);
@@ -363,6 +427,8 @@ int main() {
         transfer_widths(true);
         arm_exception_boundaries();
         thumb_exception_boundaries();
+        arm_boot_operations();
+        thumb_boot_operations();
         unsupported_encodings();
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

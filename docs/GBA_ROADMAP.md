@@ -1,6 +1,6 @@
 # Game Boy Advance roadmap
 
-The GBA has two planned release goals. The only implemented built-in system at the M20 baseline is `nes-ntsc`.
+The GBA has two planned release goals. The `gba` built-in currently supports headless BIOS boot, and `nes-ntsc` remains the default.
 
 1. **Single-player LeafGreen (M21–M26).** A player earns the Boulder Badge on the Windows and Linux desktop and can continue from the in-game save after relaunch.
 2. **Two-player LAN trading (M27–M30).** Two people on separate computers trade through the games’ cable trading room, one playing FireRed and one playing LeafGreen. Each keeps the received Pokémon in their own save after both emulators restart.
@@ -33,9 +33,15 @@ The [CPU interface](../include/rse/cpu/arm7tdmi.hpp) counts instruction boundari
 
 ### M22 · GBA memory map and BIOS boot
 
-- [ ] Headless tests cover BIOS read protection, internal and external work RAM, video memory and cartridge ROM. Compare data values, access widths and elapsed ticks for representative sequential and nonsequential Game Pak accesses.
-- [ ] An authored boot fixture runs in CI. A missing or wrong-sized BIOS and a truncated cartridge produce actionable loader errors and preserve any active session.
-- [ ] In a private run, start at the BIOS reset vector with the identified LeafGreen cartridge. Record the first instruction fetch from cartridge entry at `0x08000000` and the elapsed tick. A second cold boot reaches the same boundary. Supply the LCD status, DMA and interrupt behavior required by that boot path.
+- [x] `gba-memory-map` covers BIOS read protection, internal and external work RAM, palette RAM, VRAM, OAM and cartridge ROM. It checks Game Pak byte, halfword and word values and elapsed ticks across sequential and nonsequential accesses, all three ROM windows, a 128 KiB boundary and a WAITCNT change.
+- [x] `gba-authored-boot` runs through CTest in CI using generated firmware and cartridge bytes. It checks reset, the cartridge entry fetch, a BIOS SWI and return, and matching entry observations after reset and different advance sizes. Missing or wrong-sized BIOS files and a cartridge shorter than its header produce actionable diagnostics and preserve the active session.
+- [x] Two independent private cold boots per tested configuration started at the BIOS reset vector and reached the first ARM fetch at `0x08000000` on tick **75,690,221**, reading four bytes as opcode `0xEA00007F`. `gba-lcd-dma-irq` checks LCD status transitions, HALT wake, immediate and VBlank DMA, DMA completion IRQ and byte-wise interrupt acknowledgement.
+
+The tested implementation is `4fad45c`. Headless CTest passed 26/26 on Windows x64 with MSVC 19.44 and Ubuntu 24.04 WSL with GCC 13.3, both in Debug and Release. The private boot pair matched in Windows Debug, Windows Release and Ubuntu WSL Release. The 16 KiB BIOS SHA-1 was `300c20df6731a33952ded8c436f7f186d25d3492`. The 16 MiB LeafGreen USA revision 0 SHA-1 was `574fa542ffebb14be69902d1d36f1ec0a4afd71e`.
+
+Run the private check from the headless build with `rse-gba-boot-tests private "<LeafGreen ROM path>" "<BIOS path>"`. For a bounded headless CLI run, use `rse-cli run "<ROM path>" --ticks <count> --system gba --bios "<BIOS path>"`.
+
+The recorded tick is for the start of the logical fetch in this model. Full ARM pipeline and internal cycle timing, Game Pak prefetch and LCD memory contention still need hardware validation. The LCD logic at this milestone supplies timing and status, and the DMA and interrupt logic cover the boot path. [GBA hardware reference](https://mgba-emu.github.io/gbatek/) · [ARM7TDMI technical reference](https://documentation-service.arm.com/static/5e8e1323fd977155116a3129)
 
 ### M23 · Display, timing and keypad
 

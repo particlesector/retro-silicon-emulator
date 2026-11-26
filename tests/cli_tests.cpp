@@ -15,6 +15,7 @@ void check(bool value,const char* message) { if (!value) throw std::runtime_erro
 struct Files {
     std::filesystem::path directory="rse-cli-test-files";
     std::filesystem::path valid=directory/"valid.nes",invalid=directory/"invalid.nes",unsupported=directory/"unsupported.nes";
+    std::filesystem::path bios=directory/"bios.bin",gba=directory/"boot.gba";
     Files() {
         check(std::filesystem::create_directory(directory),"CLI fixture directory already exists");
         std::vector<std::uint8_t> bytes(16+16384,0);
@@ -22,6 +23,9 @@ struct Files {
         bytes[16]=0xe6; bytes[17]=0x10; bytes[18]=0x4c; bytes[19]=0; bytes[20]=0x80;
         bytes[16+0x3ffc]=0; bytes[16+0x3ffd]=0x80;
         write(valid,bytes); bytes[16]=2; write(unsupported,bytes); write(invalid,{1,2});
+        std::vector<std::uint8_t> firmware(16384);
+        firmware[0]=0xfe; firmware[1]=0xff; firmware[2]=0xff; firmware[3]=0xea; // ARM b .
+        write(bios,firmware); write(gba,std::vector<std::uint8_t>(192));
     }
     static void write(const std::filesystem::path& path,const std::vector<std::uint8_t>& bytes) {
         std::ofstream output(path,std::ios::binary);
@@ -30,7 +34,7 @@ struct Files {
     }
     ~Files() {
         std::error_code ignored;
-        for (const auto& path:{valid,invalid,unsupported}) std::filesystem::remove(path,ignored);
+        for (const auto& path:{valid,invalid,unsupported,bios,gba}) std::filesystem::remove(path,ignored);
         std::filesystem::remove(directory,ignored);
     }
 };
@@ -56,6 +60,7 @@ int main() {
         Files files;
         const auto valid=files.valid.string(),invalid=files.invalid.string(),unsupported=files.unsupported.string();
         const auto missing=(files.directory/"missing.nes").string();
+        const auto bios=files.bios.string(),gba=files.gba.string();
         invoke({"--help"},0,"--ticks"); invoke({"--version"},0,"0.1.0");
         invoke({"run",valid,"--ticks","120"},0,"\"ticks\":120,\"cpu_cycles\":10,\"frames\":0,\"pc\":32770");
         invoke({"run",valid,"--frames","1"},0,"\"ticks\":330096,\"cpu_cycles\":27508,\"frames\":1");
@@ -68,6 +73,10 @@ int main() {
         for (auto count:{"-1","+1","0x10","","1x","18446744073709551616"}) invoke({"run",valid,"--ticks",count},2);
         invoke({"run",missing,"--ticks","120"},5); invoke({"run",invalid,"--ticks","120"},3);
         invoke({"run",unsupported,"--ticks","120"},4);
+        invoke({"run",gba,"--ticks","12","--system","gba","--bios",bios},0,
+               "{\"format\":\"rse.session.run.v1\",\"ticks\":12,\"frames\":0}");
+        invoke({"run",gba,"--ticks","12","--system","gba"},3);
+        invoke({"run",valid,"--ticks","12","--bios",bios},3);
     } catch(const std::exception& error) { std::cerr<<error.what()<<'\n'; return 1; }
     return 0;
 }

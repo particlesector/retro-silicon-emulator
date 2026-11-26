@@ -18,6 +18,8 @@ public:
     virtual std::uint8_t load_byte(std::uint32_t address) = 0;
     virtual void store_half(std::uint32_t aligned_address, std::uint16_t value) = 0;
     virtual void store_byte(std::uint32_t address, std::uint8_t value) = 0;
+    // A taken branch, exception or other explicit PC write ends the fetch burst.
+    virtual void branch() {}
 };
 
 struct Arm7State {
@@ -54,11 +56,13 @@ private:
     void execute_arm(std::uint32_t instruction);
     void execute_thumb(std::uint16_t instruction);
     void branch_exchange(std::uint32_t target);
+    void branch_to(std::uint32_t target);
     std::uint32_t operand(unsigned reg) const;
     void change_status(std::uint32_t status);
     void enter_exception(bool irq);
     void data_processing(std::uint32_t instruction);
-    void transfer(std::uint32_t address, unsigned reg, unsigned width, bool load);
+    void transfer(std::uint32_t address, unsigned reg, unsigned width, bool load, bool sign_extend = false);
+    void transfer_multiple(std::uint32_t address, std::uint32_t registers, bool load);
     Arm7Bus& bus_;
     Arm7State state_{};
 };
