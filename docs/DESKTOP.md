@@ -29,6 +29,31 @@ gamepad bits combine with OR; simultaneous opposite directions are preserved.
 Focus loss clears keyboard state and suppresses input until focus returns.
 Gamepad removal releases its bits. There is no controller-2 or remapping UI.
 
+## Game Boy Advance
+
+Launch with your own cartridge and 16 KiB BIOS:
+
+```sh
+rse-desktop "game.gba" --system gba --bios "gba_bios.bin"
+```
+
+With `--system gba`, **O** opens the cartridge picker. If no BIOS is configured,
+the application asks for one. **F12** selects the BIOS for the next cartridge
+load. **P** pauses and resumes playback. The A, B, Select, Start and direction
+bindings are the same as in the table above. **Q** and **W** map to L and R,
+along with the controller's left and right shoulder buttons.
+
+The GBA session presents 240×160 video at 3:2 and 32,768 Hz stereo PCM. Flash
+save support is scheduled for M25. LeafGreen shows a missing save-board notice
+before starting a new game.
+
+Generate and run the authored desktop smoke fixture:
+
+```sh
+rse-gba-audio-tests generate gba-smoke
+rse-desktop --smoke gba-smoke.gba --system gba --bios gba-smoke.bin --seconds 6
+```
+
 ## Presentation and audio
 
 SDL3 uses its Vulkan renderer to present the latest completed frame at the aspect ratio supplied by the session. The NES adapter supplies an approximate NTSC palette and 4:3 aspect. The producer advances the machine in roughly 1 ms chunks and targets one audio device period plus 2 ms of queued source PCM. The GUI can wait for presentation while emulation continues. VSync defaults on. The M20 RTX 5080 training comparison used `SDL_RENDER_VSYNC=0`, which can introduce tearing.
@@ -43,7 +68,7 @@ rse-desktop --audio example.nes --seconds 30
 ```
 
 Escape or closing the window stops playback. This mode presents no emulated
-video. SDL converts the fixed 48 kHz source to the selected device format.
+video. SDL converts the session's sample rate and channel count to the selected device format.
 The producer maintains roughly 120-137 ms of queued source audio and waits when
 the queue is full. Host pacing only determines when the next fixed simulated
 block is computed. A diagnostic record reports driver, elapsed time, source

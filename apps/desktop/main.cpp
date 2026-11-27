@@ -13,6 +13,7 @@
 #endif
 int main(int argc,char** argv) {
     unsigned seconds=0;bool audio=false,smoke=false;std::filesystem::path path;std::string_view system="nes-ntsc";
+    std::filesystem::path bios;
     DesktopLoad loader;
     DesktopFinish finish;
     DesktopWorkspace workspace;
@@ -25,6 +26,7 @@ int main(int argc,char** argv) {
         std::cout<<"Usage: rse-desktop [cartridge.nes] [--seconds <1..3600>]\n"
                  <<"       rse-desktop --audio cartridge.nes [--seconds <1..3600>]\n"
                  <<"       rse-desktop --smoke fixture.nes [--seconds <5..3600>]\n"
+                 <<"       rse-desktop [cartridge.gba] --system gba [--bios bios.bin]\n"
                  <<"       Optional: --system nes-ntsc (default)\n"
 #ifdef RSE_POLICY_ENABLED
                  <<"       Optional: --model FILE --replay FILE [--provider cpu|cuda|auto]\n"
@@ -33,13 +35,14 @@ int main(int argc,char** argv) {
                  <<"                  --trainer-bridge FILE --trainer-out DIR --trainer-profile FILE]\n"
                  <<"       Trainer options: --trainer-device cpu|cuda|auto --trainer-steps COUNT\n"
                  <<"                        --trainer-observation memory|screen|hybrid --trainer-autostart\n"
-                 <<"O: Open  F1: AI workspace  F5: Reset  Escape: Exit\n";return 0;
+                 <<"O: Open  P: Pause/Resume  F1: AI workspace  F5: Reset  F12: Select GBA BIOS  Escape: Exit\n";return 0;
     }
     try {
         for (int i=1;i<argc;++i) {
             const std::string_view arg=argv[i];
             if ((arg=="--audio" || arg=="--smoke") && i==1) {audio=arg=="--audio";smoke=arg=="--smoke";}
             else if (arg=="--system" && i+1<argc) system=argv[++i];
+            else if (arg=="--bios" && i+1<argc && bios.empty()) bios=utf8_path(argv[++i]);
             else if (arg=="--workspace") workspace.visible=true;
             else if (arg=="--trainer-autostart") workspace.autostart=true;
             else if (arg=="--trainer-python" && i+1<argc) trainer.python=utf8_path(argv[++i]);
@@ -73,7 +76,8 @@ int main(int argc,char** argv) {
         if (smoke && seconds<5) throw std::invalid_argument("Smoke duration must be at least 5 seconds");
         const auto ids=rse::session::builtin_ids();
         if(std::find(ids.begin(),ids.end(),system)==ids.end())throw std::invalid_argument("Unknown built-in system: "+std::string(system));
-        if(smoke && system!="nes-ntsc")throw std::invalid_argument("Smoke fixture requires nes-ntsc");
+        if(!bios.empty() && system!="gba")throw std::invalid_argument("A BIOS is only supported for the gba system");
+        if((smoke || audio) && system=="gba" && bios.empty())throw std::invalid_argument("Supply the GBA BIOS with --bios");
         const bool configured=!trainer.python.empty() || !trainer.script.empty() || !trainer.bridge.empty() ||
             !trainer.output.empty();
         if(!workspace.observation.empty() && workspace.observation!="memory" &&
@@ -111,7 +115,7 @@ int main(int argc,char** argv) {
 #endif
     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 2;}
     if (!SDL_Init(SDL_INIT_VIDEO|SDL_INIT_GAMEPAD)) {std::cerr<<SDL_GetError()<<'\n';return 1;}
-    const int result=audio ? play_audio(path,seconds,system) :
-        run_desktop(path,seconds,smoke,system,std::move(loader),std::move(finish),std::move(workspace));
+    const int result=audio ? play_audio(path,seconds,system,bios) :
+        run_desktop(path,seconds,smoke,system,std::move(loader),std::move(finish),std::move(workspace),bios);
     SDL_Quit();return result;
 }

@@ -18,7 +18,8 @@ session::Rgba rgba(std::uint16_t color) {
 const session::SystemInfo& Session::info() const noexcept {
     static constexpr session::SystemInfo info{"gba", "Game Boy Advance",
         {clock_hz, 1}, session::VideoFormat{screen_width, screen_height, {3, 2}, session::PixelFormat::bgr555_u16_native},
-        std::nullopt, ports, true};
+        session::AudioFormat{audio::GbaApu::sample_rate, 2, session::SampleFormat::signed16_native, Bus::audio_limit},
+        ports, true};
     return info;
 }
 

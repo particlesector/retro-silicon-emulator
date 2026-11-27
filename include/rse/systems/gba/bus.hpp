@@ -2,6 +2,7 @@
 #pragma once
 #include "display.hpp"
 #include "timers.hpp"
+#include <rse/audio/gba_apu.hpp>
 #include <rse/cpu/arm7tdmi.hpp>
 #include <array>
 #include <map>
@@ -23,7 +24,8 @@ struct EntryFetch {
     bool operator==(const EntryFetch&) const = default;
 };
 
-enum class TimingKind { vblank_enter, frame, vblank_exit, timer_overflow, dma_start, dma_complete, irq_acknowledge };
+enum class TimingKind { vblank_enter, frame, vblank_exit, timer_overflow, dma_start, dma_complete, irq_acknowledge,
+                        sound_fifo_request };
 struct TimingEvent {
     std::uint64_t tick;
     TimingKind kind;
@@ -36,7 +38,8 @@ struct TimingEvent {
 // access advances elapsed master ticks, including the selected memory waits.
 class Bus final : public cpu::Arm7Bus {
 public:
-    Bus(std::span<const std::uint8_t> bios, std::span<const std::uint8_t> cartridge);
+    static constexpr std::size_t audio_limit = 65536; // Individual interleaved samples.
+    Bus(std::span<const std::uint8_t> bios, std::span<const std::uint8_t> cartridge, bool capture_audio = false);
     void reset() noexcept;
     [[nodiscard]] std::uint64_t ticks() const noexcept { return ticks_; }
     [[nodiscard]] std::optional<EntryFetch> entry_fetch() const noexcept { return entry_fetch_; }
@@ -49,6 +52,7 @@ public:
     void idle(std::uint64_t limit);
     void schedule_keys(std::uint64_t tick, std::uint16_t pressed);
     const Display& display() const noexcept { return display_; }
+    [[nodiscard]] std::vector<std::int16_t> take_audio();
     // Optional synchronous timing observer. It must neither reenter the bus
     // nor modify the emulated machine. Reset preserves the observer.
     using TimingSink = void (*)(void*, TimingEvent) noexcept;
@@ -101,6 +105,8 @@ private:
     void write_io(unsigned address, std::uint16_t value, std::uint16_t mask);
     void write_dma(unsigned address, std::uint16_t value, std::uint16_t mask);
     void trigger_dma(unsigned timing);
+    void trigger_sound_dma(unsigned requests);
+    static bool sound_dma(unsigned channel, const Dma& dma) noexcept;
     void finish_dma_unit(Dma& dma, unsigned channel, unsigned width, std::uint32_t value);
     void update_key_irq() noexcept;
     void emit(TimingKind kind, unsigned value = 0) const noexcept;
@@ -124,6 +130,9 @@ private:
     std::optional<DmaTransfer> dma_transfer_;
     Display display_;
     Timers timers_;
+    audio::GbaApu apu_;
+    std::vector<std::int16_t> pcm_;
+    bool capture_audio_{};
     TimingSink sink_{};
     void* sink_context_{};
     std::multimap<std::uint64_t, std::uint16_t> input_;

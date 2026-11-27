@@ -16,9 +16,9 @@ void SDLCALL observe(void* userdata,SDL_AudioStream*,int additional,int) {
 }
 void require(bool ok) {if (!ok) throw std::runtime_error(SDL_GetError());}
 }
-int play_audio(const std::filesystem::path& path,unsigned seconds,std::string_view system) {
+int play_audio(const std::filesystem::path& path,unsigned seconds,std::string_view system,const std::filesystem::path& bios) {
     try {
-        auto machine=rse::session::load(system,path);
+        auto machine=rse::session::load(system,path,bios);
         if(!machine->info().audio)throw rse::session::UnsupportedOperation("System has no audio");
         require(SDL_InitSubSystem(SDL_INIT_AUDIO));
         const auto format=*machine->info().audio;

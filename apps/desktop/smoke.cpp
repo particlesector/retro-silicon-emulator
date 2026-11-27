@@ -16,6 +16,7 @@ std::optional<std::uint8_t> smoke_memory(const session::Session& machine,std::ui
 namespace {
 constexpr std::uint64_t first_stage_ms=500,stage_interval_ms=150,blocked_gui_ms=150;
 constexpr unsigned final_stage=16;
+constexpr unsigned gba_final_stage=26;
 constexpr std::size_t response_pixel=32000;
 constexpr std::uint64_t minimum_stall_samples=4800;
 void expect(bool ok,const char* reason) {if(!ok)throw std::runtime_error(reason);}
@@ -33,7 +34,7 @@ void SmokeMetrics::report(std::ostream& output) const {
           <<" input_responses="<<responses<<" input_min_us="<<min_us
           <<" input_max_us="<<max_us<<" input_mean_us="<<(responses?sum_us/responses:0);
 }
-Smoke::Smoke(std::filesystem::path fixture):path_(std::move(fixture)) {
+Smoke::Smoke(std::filesystem::path fixture,bool gba):path_(std::move(fixture)),gba_(gba) {
     SDL_VirtualJoystickDesc desc;
     SDL_INIT_INTERFACE(&desc);
     desc.type=SDL_JOYSTICK_TYPE_GAMEPAD;
@@ -60,6 +61,7 @@ void Smoke::response(std::uint16_t sample) {
     input_start_=SDL_GetTicksNS();
 }
 void Smoke::tick(SmokeHost& host,std::uint64_t elapsed) {
+    if(gba_) {tick_gba(host,elapsed);return;}
     const auto state=host.observation();
     // Sessions have no published frame during initial load/reset. The overall
     // duration/final-stage checks still fail if publication never resumes.
@@ -125,9 +127,85 @@ void Smoke::tick(SmokeHost& host,std::uint64_t elapsed) {
     default:break;
     }
 }
+
+void Smoke::tick_gba(SmokeHost& host,std::uint64_t elapsed) {
+    const auto state=host.observation();
+    if (state.frame_samples.empty() || elapsed < next_gba_stage_ || stage_ > gba_final_stage) return;
+    expect(state.format.width==240 && state.format.height==160 && state.frame_samples.size()==240*160 &&
+           state.format.display_aspect==session::Rational{3,2},"GBA frame dimensions or display aspect");
+    expect(state.frame_samples.back()==session::Rgba{132,132,132,255},"GBA authored backdrop was not published");
+    next_gba_stage_=elapsed+120;
+    constexpr SDL_Scancode keyboard[]{SDL_SCANCODE_X,SDL_SCANCODE_Z,SDL_SCANCODE_RSHIFT,SDL_SCANCODE_RETURN,
+        SDL_SCANCODE_UP,SDL_SCANCODE_DOWN,SDL_SCANCODE_LEFT,SDL_SCANCODE_RIGHT,SDL_SCANCODE_Q,SDL_SCANCODE_W};
+    constexpr SDL_GamepadButton gamepad[]{SDL_GAMEPAD_BUTTON_SOUTH,SDL_GAMEPAD_BUTTON_WEST,
+        SDL_GAMEPAD_BUTTON_BACK,SDL_GAMEPAD_BUTTON_START,SDL_GAMEPAD_BUTTON_DPAD_UP,SDL_GAMEPAD_BUTTON_DPAD_DOWN,
+        SDL_GAMEPAD_BUTTON_DPAD_LEFT,SDL_GAMEPAD_BUTTON_DPAD_RIGHT,SDL_GAMEPAD_BUTTON_LEFT_SHOULDER,
+        SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER};
+    constexpr unsigned keyinput_bits[]{0,1,2,3,6,7,5,4,9,8};
+    const auto key=[&](SDL_Scancode code,bool down) {
+        SDL_Event event{};
+        event.type=down ? SDL_EVENT_KEY_DOWN : SDL_EVENT_KEY_UP;
+        event.key.scancode=code;
+        require_sdl(SDL_PushEvent(&event));
+    };
+    const auto button=[&](unsigned index,bool down) {
+        require_sdl(SDL_SetJoystickVirtualButton(joystick_.get(),gamepad[index],down));
+    };
+    const auto verify=[&](unsigned mask,unsigned pressed) {
+        const auto pixel=state.frame_samples.front();
+        const unsigned word=(pixel.r>>3)|((pixel.g>>3)<<5)|((pixel.b>>3)<<10);
+        expect(state.buttons==mask && word==(0x3ff ^ pressed),"GBA desktop binding did not reach KEYINPUT");
+    };
+    const auto step=stage_++;
+    if(step==0) {
+        SDL_Event focus{};focus.type=SDL_EVENT_WINDOW_FOCUS_GAINED;
+        require_sdl(SDL_PushEvent(&focus));
+        host.resize_window(1000,480);host.request_readback();
+        key(keyboard[0],true);
+    } else if(step<=10) {
+        verify(1u<<(step-1),1u<<keyinput_bits[step-1]);
+        key(keyboard[step-1],false);
+        if(step<10) key(keyboard[step],true);
+    } else if(step==11) {
+        verify(0,0);
+        host.select_gamepad(id_);
+        button(0,true);
+    } else if(step<=21) {
+        const unsigned previous=step-12;
+        verify(1u<<previous,1u<<keyinput_bits[previous]);
+        button(previous,false);
+        if(previous<9) button(previous+1,true);
+    } else if(step==22) {
+        verify(0,0);
+        expect(state.audio_running && state.samples>0,"GBA audio did not start");
+        key(SDL_SCANCODE_P,true);
+    } else if(step==23) {
+        expect(!state.audio_running,"manual pause left audio running");
+        paused_tick_=state.tick;
+        paused_samples_=state.samples;
+        key(SDL_SCANCODE_P,false);
+    } else if(step==24) {
+        expect(state.tick==paused_tick_ && state.samples==paused_samples_,"paused GBA timeline advanced");
+        key(SDL_SCANCODE_P,true);
+    } else if(step==25) {
+        expect(state.audio_running && state.tick>paused_tick_ && state.samples>paused_samples_,
+               "GBA audio or frame timeline did not resume");
+        before_reset_frame_=state.frame_number;
+        key(SDL_SCANCODE_P,false);
+        key(SDL_SCANCODE_F5,true);
+    } else {
+        verify(0,0);
+        expect(state.resets==1 && state.frame_number>0 && state.frame_number<before_reset_frame_ &&
+               state.audio_running && state.samples>0,"GBA reset did not recover frames, input and audio");
+        host.request_readback();
+    }
+    if ((step>=1 && step<=10) || (step>=12 && step<=21)) ++metrics_.responses;
+}
+
 void Smoke::finish(SmokeHost& host) {
     const auto state=host.observation();
-    if(stage_<=final_stage || state.readbacks<3 || state.starvation || metrics_.responses!=4)
+    if(stage_<=(gba_ ? gba_final_stage : final_stage) || state.readbacks<(gba_ ? 2u : 3u) ||
+       state.starvation || metrics_.responses!=(gba_ ? 20u : 4u))
         throw std::runtime_error("desktop smoke acceptance failed: stage="+std::to_string(stage_)+
             " readbacks="+std::to_string(state.readbacks)+" starvation="+std::to_string(state.starvation));
     SDL_Event e{};e.type=SDL_EVENT_WINDOW_CLOSE_REQUESTED;require_sdl(SDL_PushEvent(&e));host.pump();
