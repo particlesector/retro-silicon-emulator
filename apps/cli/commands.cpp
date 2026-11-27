@@ -13,7 +13,7 @@ int run(std::span<const std::string_view> args,std::ostream& output,std::ostream
         output<<"Usage: rse-cli --help|--version\n"
               <<"       rse-cli run <rom.nes> --ticks <master-ticks>\n"
               <<"       rse-cli run <rom.nes> --frames <count>\n"
-              <<"       rse-cli run <rom.gba> --ticks <master-ticks> --system gba --bios <bios.bin>\n"
+              <<"       rse-cli run <rom.gba> (--ticks <master-ticks>|--frames <count>) --system gba --bios <bios.bin>\n"
               <<"       Optional: --system nes-ntsc (default)\n";
         return 0;
     }

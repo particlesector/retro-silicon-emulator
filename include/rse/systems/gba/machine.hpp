@@ -14,12 +14,17 @@ public:
     Machine& operator=(const Machine&) = delete;
     void reset() noexcept;
     void step();
+    // Advance every device exactly through the requested board tick.
+    void advance_to(std::uint64_t tick);
+    void schedule_keys(std::uint64_t tick, std::uint16_t pressed) { bus_.schedule_keys(tick, pressed); }
     [[nodiscard]] const Bus& bus() const noexcept { return bus_; }
     [[nodiscard]] const cpu::Arm7State& cpu() const noexcept { return cpu_.state(); }
 
 private:
+    void step_until(std::uint64_t limit);
     Bus bus_;
     cpu::Arm7Tdmi cpu_;
+    bool cpu_in_progress_{};
 };
 
 }

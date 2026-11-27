@@ -17,7 +17,7 @@ struct Rgba {
     bool operator==(const Rgba&) const=default;
 };
 // Borrowed byte views are in-process data, not a serialized image format.
-enum class PixelFormat { indexed_u16_native,rgba8 };
+enum class PixelFormat { indexed_u16_native,rgba8,bgr555_u16_native };
 struct VideoFormat {
     unsigned width{},height{};
     Rational display_aspect;
