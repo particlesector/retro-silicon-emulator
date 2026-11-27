@@ -1,6 +1,6 @@
 # Game Boy Advance roadmap
 
-The GBA has two planned release goals. The `gba` built-in supports headless BIOS boot, video and keypad input, and `nes-ntsc` remains the default.
+The GBA has two planned release goals. The `gba` built-in supports headless and desktop playback with video, keypad input and stereo audio. The default system is `nes-ntsc`.
 
 1. **Single-player LeafGreen (M21–M26).** A player earns the Boulder Badge on the Windows and Linux desktop and can continue from the in-game save after relaunch.
 2. **Two-player LAN trading (M27–M30).** Two people on separate computers trade through the games’ cable trading room, one playing FireRed and one playing LeafGreen. Each keeps the received Pokémon in their own save after both emulators restart.
@@ -55,9 +55,27 @@ The renderer composes one line at HBlank and publishes the completed image at VB
 
 ### M24 · Desktop play and sound
 
-- [ ] A generated sound fixture exercises PSG channels and timer/DMA-fed Direct Sound. Check FIFO refill timing, left/right routing and sample counts. Compare stereo PCM hashes across reset and chunked runs.
-- [ ] Desktop smoke loads a user-selected ROM and BIOS, presents the session dimensions at 3:2 aspect and verifies all ten keyboard/gamepad bindings, including L/R. Pause/resume and reset recover input, frames and audio. The bounded playback run reports zero audio starvation.
-- [ ] In a private LeafGreen run, reach the title, start a new game, choose a starter and finish the first rival battle. Record the input path and check visible text, sprites, battle transitions, music and sound effects.
+- [x] `gba-audio` checks each PSG generator, left/right routing and timer selection for the two Direct Sound channels. Its first FIFO A request is at tick 612, and the four DMA words complete at tick 622. An authored program generates 548 stereo frames by tick 280,896. Its interleaved S16 FNV-1a hash `7bde98df7a93717d` matches after reset and uneven advances.
+- [x] The authored GBA desktop smoke loads external ROM and BIOS files and checks the 240×160, 3:2 frame through Vulkan readback. It verifies all ten keyboard and all ten standard gamepad bindings against the ROM's KEYINPUT display. Both extracted Release packages pause, resume and reset correctly, and report zero starvation requests over six seconds with SDL dummy audio.
+- [x] A private LeafGreen run reached the title, started a new game, selected Bulbasaur, defeated rival B's Charmander with Tackle, and returned to Oak's lab. Captures verified title and dialogue text, trainer and Pokémon sprites, battle HUD, victory text, and transitions into and out of battle. PCM captures verified title music, battle audio and an input-triggered selection effect.
+
+The tested implementation is `5136e9b`. CTest passed 33/33 with desktop enabled in Debug and Release on Windows x64 with MSVC 19.44 and Ubuntu 24.04 WSL with GCC 13.3. The independent Windows headless Release build passed 31/31. Extracted Windows and Linux desktop smokes each verified 20 bindings, two Vulkan readbacks and one reset. A 21-second Windows Release desktop run with private media also reported zero starvation requests. Repeat private cold boots fetched cartridge entry on tick 75,690,241 with the sound model active.
+
+The private input run used the BIOS and LeafGreen USA revision 0 SHA-1 values in the media table, on Ubuntu 24.04 WSL with GCC 13.3 and optimization enabled. The frame numbers below count from the first publication after cold reset.
+
+| Frame | Observed checkpoint and input path |
+| --- | --- |
+| 1,091 | LeafGreen title. Pressed Start and acknowledged the absent flash-board notice with A. |
+| 5,298 | Player A's bedroom. Advanced the instructions and Oak's introduction with A, chose the boy character, and entered A for the player and B for the rival using the D-pad, A and Start. |
+| 5,900 | Pallet Town. Walked right, up and left to descend the stairs, crossed the living room to the front door, and exited south. Walked east, then north to the grass to trigger Oak's lab escort. |
+| 9,689 | Received Bulbasaur. Advanced Oak's dialogue, approached the left ball from below, confirmed with A, and declined the nickname. Walked toward the lab exit to trigger B's challenge. |
+| 11,399 | Battle introduction. Advanced the challenge and battle tutorial with A, then selected Fight and Tackle. |
+| 16,297 | Victory. Bulbasaur reached level 6 with 9/21 HP, and the game displayed the rival defeat message. |
+| 18,005 | Returned to the lab after advancing the result and tutorial text. |
+
+The title PCM contained 65,272 nonzero channel samples over 32,917 stereo frames. A control replay of the naming screen matched the preceding video frame's PCM byte-for-byte and differed by 6,982 channel samples after pressing A to enter a character. The audio checks use captured digital PCM. [Title music call](https://github.com/pret/pokefirered/blob/master/src/title_screen.c) · [Naming effect call](https://github.com/pret/pokefirered/blob/master/src/naming_screen.c)
+
+The mixer produces fixed-rate 32,768 Hz stereo PCM. PWM resolution changes and analog output characteristics remain unverified. Flash detection and persistence are tracked in M25. [GBA sound registers](https://mgba-emu.github.io/gbatek/#gba-sound-controller)
 
 ### M25 · Flash saves and recovery
 
