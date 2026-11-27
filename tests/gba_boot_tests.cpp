@@ -212,6 +212,7 @@ void private_boot(const std::filesystem::path& rom, const std::filesystem::path&
         // One-tick requests stop before dispatch of the next instruction after entry.
         for (rse::Tick target = 1; target <= 6 * clock_hz; ++target) {
             gba.advance_to(target);
+            if (target % 0x40000 == 0) (void)gba.take_audio();
             if (const auto entry = gba.entry_fetch()) return *entry;
         }
         throw std::runtime_error("GBA cartridge entry was not fetched within six emulated seconds");

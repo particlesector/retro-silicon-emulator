@@ -3,11 +3,15 @@
 #include <algorithm>
 #include <cassert>
 #include <stdexcept>
+#include <utility>
 
 namespace rse::gba {
 namespace {
 constexpr unsigned dma_start = 0xb0, dma_end = 0xe0;
 constexpr unsigned timer_start = 0x100, timer_end = 0x110;
+constexpr unsigned sound_start = 0x060, sound_end = 0x0a8;
+constexpr std::uint32_t fifo_start = 0x040000a0;
+constexpr unsigned sound_words = 4;
 constexpr std::uint32_t entry = 0x08000000;
 
 std::uint32_t read_le(std::span<const std::uint8_t> bytes, unsigned offset, unsigned width) {
@@ -32,7 +36,8 @@ std::uint32_t next_dma_address(std::uint32_t address, unsigned mode, unsigned wi
 }
 }
 
-Bus::Bus(std::span<const std::uint8_t> bios, std::span<const std::uint8_t> cartridge) {
+Bus::Bus(std::span<const std::uint8_t> bios, std::span<const std::uint8_t> cartridge, bool capture_audio)
+    : capture_audio_(capture_audio) {
     if (bios.empty()) throw std::invalid_argument("GBA BIOS is required (supply a 16384-byte BIOS)");
     if (bios.size() != bios_size) throw std::invalid_argument("GBA BIOS must be exactly 16384 bytes");
     if (cartridge.size() < cartridge_header_size)
@@ -57,6 +62,8 @@ void Bus::reset() noexcept {
     dma_transfer_.reset();
     display_.reset();
     timers_ = {};
+    apu_ = {};
+    pcm_.clear();
     input_.clear();
     pressed_ = keycnt_ = 0;
     key_match_ = false;
@@ -99,6 +106,7 @@ std::uint64_t Bus::ticks_to_event() const noexcept {
     std::uint64_t next = ticks_to_lcd_event();
     if (timers_.next_overflow() != Timers::never) next = std::min(next, timers_.next_overflow() - ticks_);
     if (!input_.empty()) next = std::min(next, input_.begin()->first - ticks_);
+    next = std::min<std::uint64_t>(next, audio::GbaApu::sample_period - ticks_ % audio::GbaApu::sample_period);
     return next;
 }
 
@@ -148,12 +156,20 @@ void Bus::advance(unsigned ticks) {
                 if (!(wrapped & (1u << timer))) continue;
                 emit(TimingKind::timer_overflow, timer);
                 if (timers_.irq_enabled(timer)) if_ |= std::uint16_t(8u << timer);
+                if (timer < 2) trigger_sound_dma(apu_.timer_overflow(timer));
             }
         }
         while (!input_.empty() && input_.begin()->first == ticks_) {
             pressed_ = input_.begin()->second;
             input_.erase(input_.begin());
             update_key_irq();
+        }
+        if (ticks_ % audio::GbaApu::sample_period == 0) {
+            const auto stereo = apu_.sample(ticks_);
+            if (capture_audio_) {
+                if (pcm_.size() + stereo.size() > audio_limit) throw std::runtime_error("GBA PCM buffer is full");
+                pcm_.insert(pcm_.end(), stereo.begin(), stereo.end());
+            }
         }
         next = ticks_to_event();
     }
@@ -163,6 +179,7 @@ void Bus::advance(unsigned ticks) {
 }
 
 void Bus::idle_to_lcd_event() { advance(ticks_to_lcd_event()); }
+std::vector<std::int16_t> Bus::take_audio() { return std::exchange(pcm_, {}); }
 void Bus::idle(std::uint64_t limit) { advance(unsigned(std::min(ticks_to_event(), limit - ticks_))); }
 
 void Bus::schedule_keys(std::uint64_t tick, std::uint16_t pressed) {
@@ -226,6 +243,7 @@ std::uint16_t Bus::read_io(unsigned address) const {
             return reg % 12 == 10 ? dma_[reg / 12].control : 0;
         }
         if (address >= timer_start && address < timer_end) return timers_.read(address - timer_start, ticks_);
+        if (address >= sound_start && address < sound_end) return apu_.read(address - sound_start);
         return io_[address / 2];
     }
 }
@@ -262,6 +280,7 @@ void Bus::write_io(unsigned address, std::uint16_t value, std::uint16_t mask) {
     default:
         if (address >= dma_start && address < dma_end) write_dma(address, value, mask);
         else if (address >= timer_start && address < timer_end) timers_.write(address - timer_start, value, mask, ticks_);
+        else if (address >= sound_start && address < sound_end) apu_.write(address - sound_start, value, mask, ticks_);
         else {
             io_[address / 2] = merge(io_[address / 2]);
             if ((address >= 0x28 && address <= 0x2e) || (address >= 0x38 && address <= 0x3e))
@@ -419,10 +438,11 @@ void Bus::write_dma(unsigned address, std::uint16_t value, std::uint16_t mask) {
             dma.pending = false;
             dma.remaining = 0;
         } else if (!enabled) {
-            const unsigned align = (dma.control & 0x0400) ? ~3u : ~1u;
+            const bool fifo = sound_dma(channel, dma);
+            const unsigned align = fifo || (dma.control & 0x0400) ? ~3u : ~1u;
             dma.current_source = dma.source & align;
             dma.current_destination = dma.destination & align;
-            dma.remaining = dma.count ? dma.count : count_mask + 1;
+            dma.remaining = fifo ? sound_words : (dma.count ? dma.count : count_mask + 1);
             dma.pending = (dma.control & 0x3800) == 0;
         }
         break;
@@ -433,6 +453,24 @@ void Bus::write_dma(unsigned address, std::uint16_t value, std::uint16_t mask) {
 void Bus::trigger_dma(unsigned timing) {
     for (auto& dma : dma_) {
         if ((dma.control & 0xb000) == (0x8000 | (timing << 12))) dma.pending = true;
+    }
+}
+
+bool Bus::sound_dma(unsigned channel, const Dma& dma) noexcept {
+    const auto destination = dma.destination & ~3u;
+    return (channel == 1 || channel == 2) && (dma.control & 0x3000) == 0x3000 &&
+           (destination == fifo_start || destination == fifo_start + 4);
+}
+
+void Bus::trigger_sound_dma(unsigned requests) {
+    if (!requests) return;
+    for (unsigned channel : {1u, 2u}) {
+        auto& dma = dma_[channel];
+        if (!(dma.control & 0x8000) || dma.pending || !sound_dma(channel, dma)) continue;
+        const unsigned fifo = (dma.destination & 4) ? 1 : 0;
+        if (!(requests & (1u << fifo))) continue;
+        dma.pending = true;
+        emit(TimingKind::sound_fifo_request, fifo);
     }
 }
 
@@ -456,7 +494,7 @@ void Bus::step_dma(std::uint64_t limit) {
     }
     auto& transfer = *dma_transfer_;
     auto& dma = dma_[transfer.channel];
-    const unsigned width = (dma.control & 0x0400) ? 4 : 2;
+    const unsigned width = sound_dma(transfer.channel, dma) || (dma.control & 0x0400) ? 4 : 2;
     const auto source = dma.current_source, destination = dma.current_destination;
     if (transfer.phase == DmaPhase::startup) {
         if (!consume(transfer.clocks, limit)) return;
@@ -477,7 +515,8 @@ void Bus::step_dma(std::uint64_t limit) {
 
 void Bus::finish_dma_unit(Dma& dma, unsigned channel, unsigned width, std::uint32_t value) {
     const auto source = dma.current_source, destination = dma.current_destination;
-    const unsigned dest_mode = (dma.control >> 5) & 3;
+    const bool fifo = sound_dma(channel, dma);
+    const unsigned dest_mode = fifo ? 2 : (dma.control >> 5) & 3;
     const unsigned source_mode = (dma.control >> 7) & 3;
     dma.reads = {source, width, Access::load};
     dma.writes = {destination, width, Access::store};
@@ -489,7 +528,7 @@ void Bus::finish_dma_unit(Dma& dma, unsigned channel, unsigned width, std::uint3
         dma_owner_.reset();
         if (dma.control & 0x4000) if_ |= std::uint16_t(0x100u << channel);
         if ((dma.control & 0x3000) && (dma.control & 0x0200)) {
-            dma.remaining = dma.count ? dma.count : (channel == 3 ? 0x10000 : 0x4000);
+            dma.remaining = fifo ? sound_words : (dma.count ? dma.count : (channel == 3 ? 0x10000 : 0x4000));
             if (dest_mode == 3) dma.current_destination = dma.destination & ~(width - 1);
         } else {
             dma.control &= ~0x8000;
