@@ -13,6 +13,8 @@ namespace rse::session {
 [[nodiscard]] std::unique_ptr<Session> create(std::string_view id,std::span<const std::uint8_t> image,
     std::span<const std::uint8_t> bios);
 [[nodiscard]] std::unique_ptr<Session> load(std::string_view id,const std::filesystem::path& path);
+// FLASH1M cartridges loaded from disk use a raw 128 KiB sidecar formed by
+// appending .sav to the cartridge filename. Call flush_save() to commit it.
 [[nodiscard]] std::unique_ptr<Session> load(std::string_view id,const std::filesystem::path& path,
     const std::filesystem::path& bios);
 }

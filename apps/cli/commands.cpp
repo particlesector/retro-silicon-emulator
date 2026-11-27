@@ -42,6 +42,7 @@ int run(std::span<const std::string_view> args,std::ostream& output,std::ostream
     catch(const std::exception& e) { error<<e.what()<<'\n'; return 6; }
     try {
         execute(*machine,args[2]=="--frames",count);
+        machine->flush_save();
         if(machine->info().id=="nes-ntsc")write_nes_v1(*machine,output);
         else {
             const auto state=machine->status();

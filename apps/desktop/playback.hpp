@@ -25,6 +25,7 @@ public:
     // clear its stream. The application owns that stream and its callbacks.
     void replace(std::unique_ptr<session::Session> machine);
     void reset();
+    void flush_save();
     void clear();
     void active(bool value);
     // Commands and snapshots are serialized with one bounded producer batch.

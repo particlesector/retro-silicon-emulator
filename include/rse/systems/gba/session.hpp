@@ -6,7 +6,7 @@
 namespace rse::gba {
 
 // Headless GBA adapter with exact board-clock advance and VBlank publications.
-class Session final : public session::Session {
+class Session : public session::Session {
 public:
     Session(std::span<const std::uint8_t> bios, std::span<const std::uint8_t> cartridge)
         : machine_(bios, cartridge, true) {}
@@ -20,6 +20,9 @@ public:
     void convert_video(std::span<session::Rgba> output) const override;
     std::vector<std::int16_t> take_audio() override { return machine_.take_audio(); }
     [[nodiscard]] std::optional<EntryFetch> entry_fetch() const noexcept;
+
+protected:
+    [[nodiscard]] auto& flash() noexcept { return machine_.flash(); }
 
 private:
     Machine machine_;

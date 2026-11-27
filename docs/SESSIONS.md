@@ -74,6 +74,20 @@ Use `session::create("gba", cartridge_bytes, bios_bytes)` for authored fixtures.
 Construct the replacement session before releasing the current one so media
 errors leave the current session available.
 
+The board attaches a 128 KiB Sanyo flash device when the ROM contains a
+`FLASH1M_V` marker. It maps byte commands at `0x0e000000`–`0x0e00ffff`
+using the backup wait setting in WAITCNT. Reset returns the chip to bank zero
+and array-read mode and preserves the programmed contents. A session created
+from bytes keeps flash in memory. A file-loaded session reads the raw sidecar
+at the resolved cartridge path plus `.sav`, or starts with erased flash if
+there is no sidecar.
+
+Call `flush_save()` while emulation is stopped to commit dirty storage. The
+loader stages the complete image on the same filesystem and renames it over
+the destination. Failed commits throw and leave the dirty data available for
+retry. The desktop stops its producer before flushing on close or cartridge
+replacement. The CLI flushes after successful execution.
+
 The adapter reports a 16,777,216 Hz clock and 240×160 native BGR555 video with
 a 3:2 display aspect. The first frame publishes at tick 197,120, followed by
 one every 280,896 ticks. `run_frame()` advances to the next publication, and

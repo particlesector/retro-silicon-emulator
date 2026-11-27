@@ -19,6 +19,7 @@ public:
     void schedule_keys(std::uint64_t tick, std::uint16_t pressed) { bus_.schedule_keys(tick, pressed); }
     [[nodiscard]] std::vector<std::int16_t> take_audio() { return bus_.take_audio(); }
     [[nodiscard]] const Bus& bus() const noexcept { return bus_; }
+    [[nodiscard]] auto& flash() noexcept { return bus_.flash(); }
     [[nodiscard]] const cpu::Arm7State& cpu() const noexcept { return cpu_.state(); }
 
 private:

@@ -75,6 +75,7 @@ public:
     }
     bool load_media(const std::filesystem::path& path,const std::filesystem::path& bios) {
         try {
+            if (system_id=="gba") flush_save();
             auto next=loader ? loader(path) : session::load(system_id,path,bios);
             replace_session(std::move(next),path);
             model_name_.clear();
@@ -221,8 +222,12 @@ public:
         stop_audio();playback->reset();input.clear();visible={};running_audio=false;redraw=true;++resets;
     }
     void connect(SDL_JoystickID id) {if (!pad && SDL_IsGamepad(id)) pad.reset(SDL_OpenGamepad(id));}
+    void close() {
+        try { flush_save();running=false; }
+        catch (const std::exception& e) { paused=true;error(e.what()); }
+    }
     void event(const SDL_Event& e) {
-        if (e.type==SDL_EVENT_QUIT || e.type==SDL_EVENT_WINDOW_CLOSE_REQUESTED) {running=false;return;}
+        if (e.type==SDL_EVENT_QUIT || e.type==SDL_EVENT_WINDOW_CLOSE_REQUESTED) {close();return;}
         if (e.type==SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED || e.type==SDL_EVENT_WINDOW_EXPOSED) redraw=true;
         if (e.type==SDL_EVENT_WINDOW_FOCUS_LOST) {input.focus(false);return;}
         if (e.type==SDL_EVENT_WINDOW_FOCUS_GAINED) {input.focus(true);return;}
@@ -234,7 +239,7 @@ public:
         if (e.type==SDL_EVENT_KEY_DOWN || e.type==SDL_EVENT_KEY_UP) {
             const bool down=e.type==SDL_EVENT_KEY_DOWN;input.key(key_mask(e.key.scancode,system_id=="gba"),down);
             if (down && !e.key.repeat) {
-                if (e.key.scancode==SDL_SCANCODE_ESCAPE) running=false;
+                if (e.key.scancode==SDL_SCANCODE_ESCAPE) {close();return;}
                 if (e.key.scancode==SDL_SCANCODE_F5) reset();
                 if (e.key.scancode==SDL_SCANCODE_O) open();
                 if (e.key.scancode==SDL_SCANCODE_F12 && system_id=="gba") open(DialogKind::bios);
@@ -322,6 +327,10 @@ public:
         playback->active(false);
         if(audio)require_sdl(SDL_PauseAudioStreamDevice(audio.get()));
         running_audio=false;
+    }
+    void flush_save() {
+        stop_audio();
+        playback->flush_save();
     }
     void stop_audio() {
         pause_audio();
@@ -448,7 +457,7 @@ int run_desktop(const std::filesystem::path& cartridge,unsigned seconds,bool smo
             if (script) script->tick(app,SDL_GetTicks()-start);app.step();app.idle();
         }
         if (script) std::cerr<<"Smoke stopping audio\n";
-        app.stop_audio();const auto elapsed=SDL_GetTicks()-start;app.report(elapsed,script?script->metrics():SmokeMetrics{});
+        app.flush_save();const auto elapsed=SDL_GetTicks()-start;app.report(elapsed,script?script->metrics():SmokeMetrics{});
         if(finish) app.finish(finish);
         if (script) {
             if(elapsed<std::uint64_t(seconds)*1000) throw std::runtime_error("smoke exited before its requested duration");

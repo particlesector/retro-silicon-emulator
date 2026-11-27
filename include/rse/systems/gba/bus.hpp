@@ -3,6 +3,7 @@
 #include "display.hpp"
 #include "timers.hpp"
 #include <rse/audio/gba_apu.hpp>
+#include <rse/cartridge/flash1m.hpp>
 #include <rse/cpu/arm7tdmi.hpp>
 #include <array>
 #include <map>
@@ -53,6 +54,8 @@ public:
     void schedule_keys(std::uint64_t tick, std::uint16_t pressed);
     const Display& display() const noexcept { return display_; }
     [[nodiscard]] std::vector<std::int16_t> take_audio();
+    [[nodiscard]] const auto& flash() const noexcept { return flash_; }
+    [[nodiscard]] auto& flash() noexcept { return flash_; }
     // Optional synchronous timing observer. It must neither reenter the bus
     // nor modify the emulated machine. Reset preserves the observer.
     using TimingSink = void (*)(void*, TimingEvent) noexcept;
@@ -120,6 +123,7 @@ private:
 
     std::array<std::uint8_t, bios_size> bios_{};
     std::vector<std::uint8_t> rom_;
+    std::optional<cartridge::Flash1M> flash_;
     std::array<std::uint8_t, 0x40000> ewram_{};
     std::array<std::uint8_t, 0x8000> iwram_{};
     std::array<std::uint8_t, 0x400> palette_{}, oam_{};
