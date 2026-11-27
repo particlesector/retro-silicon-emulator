@@ -43,9 +43,19 @@ load. **P** pauses and resumes playback. The A, B, Select, Start and direction
 bindings are the same as in the table above. **Q** and **W** map to L and R,
 along with the controller's left and right shoulder buttons.
 
-The GBA session presents 240×160 video at 3:2 and 32,768 Hz stereo PCM. Flash
-save support is scheduled for M25. LeafGreen shows a missing save-board notice
-before starting a new game.
+The GBA session presents 240×160 video at 3:2 and 32,768 Hz stereo PCM.
+Choose **Save** in LeafGreen and wait for the game to confirm completion.
+When you close the window, press **Esc**, or open another cartridge, the
+desktop commits changed 128 KiB flash data to a file beside the cartridge.
+For example, `game.gba` uses `game.gba.sav`. Reopen the same cartridge and
+select **Continue**. **F5** preserves the in-memory save.
+
+The cartridge's directory must be writable to commit a save. If a commit
+fails, the desktop reports the error and keeps the current session so you
+can fix the problem and retry. Existing save files must be exactly 131,072
+bytes. Use separate cartridge paths for concurrent sessions that need
+independent saves. Changes since the last commit can be lost if the process
+is terminated abruptly.
 
 Generate and run the authored desktop smoke fixture:
 

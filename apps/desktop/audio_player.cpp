@@ -54,6 +54,7 @@ int play_audio(const std::filesystem::path& path,unsigned seconds,std::string_vi
             fill();SDL_Delay(2);
         }
         require(SDL_PauseAudioStreamDevice(stream.get()));
+        machine->flush_save();
         const auto elapsed=SDL_GetTicks()-start;
         const auto starved=starvation.requests.load(std::memory_order_relaxed);
         std::cout<<"Audio playback: driver="<<SDL_GetCurrentAudioDriver()<<" elapsed_ms="<<elapsed

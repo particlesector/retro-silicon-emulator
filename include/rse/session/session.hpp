@@ -28,6 +28,9 @@ public:
         throw UnsupportedOperation("Snapshots are unavailable");
     }
     virtual void reset()=0;
+    // Commit dirty cartridge storage when configured. Failure leaves it dirty
+    // so the host can report the error and retry while the session is alive.
+    virtual void flush_save() {}
     // Inclusive system-defined master ticks; equal target is a no-op, rewind
     // is rejected. Execution failures require reset; invalid requests do not.
     virtual void advance_to(Tick target)=0;

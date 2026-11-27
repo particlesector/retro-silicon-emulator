@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <stdexcept>
+#include <string_view>
 #include <utility>
 
 namespace rse::gba {
@@ -13,6 +14,7 @@ constexpr unsigned sound_start = 0x060, sound_end = 0x0a8;
 constexpr std::uint32_t fifo_start = 0x040000a0;
 constexpr unsigned sound_words = 4;
 constexpr std::uint32_t entry = 0x08000000;
+constexpr std::uint32_t flash_start = 0x0e000000, flash_end = flash_start + cartridge::Flash1M::bank_size;
 
 std::uint32_t read_le(std::span<const std::uint8_t> bytes, unsigned offset, unsigned width) {
     std::uint32_t value{};
@@ -46,10 +48,13 @@ Bus::Bus(std::span<const std::uint8_t> bios, std::span<const std::uint8_t> cartr
         throw std::invalid_argument("GBA cartridge exceeds the 32 MiB Game Pak ROM limit");
     std::ranges::copy(bios, bios_.begin());
     rom_.assign(cartridge.begin(), cartridge.end());
+    constexpr std::string_view marker = "FLASH1M_V";
+    if (!std::ranges::search(cartridge, marker).empty()) flash_.emplace();
     reset();
 }
 
 void Bus::reset() noexcept {
+    if (flash_) flash_->reset();
     ewram_.fill(0);
     iwram_.fill(0);
     palette_.fill(0);
@@ -86,6 +91,10 @@ unsigned Bus::access_ticks(std::uint32_t address, unsigned width, bool sequentia
     const unsigned beats = width == 4 ? 2 : 1;
     if (region == 2) return 3 * beats;
     if (region == 5 || region == 6) return beats;
+    if (flash_ && width == 1 && address >= flash_start && address < flash_end) {
+        constexpr unsigned waits[] = {4, 3, 2, 8};
+        return 1 + waits[waitcnt_ & 3];
+    }
     if (region >= 8 && region <= 13) {
         constexpr unsigned nonseq_waits[] = {4, 3, 2, 8};
         const unsigned bank = (region - 8) / 2;
@@ -325,6 +334,8 @@ std::uint32_t Bus::read_data(std::uint32_t address, unsigned width, bool bios_ac
         return value;
     }
     }
+    if (flash_ && width == 1 && address >= flash_start && address < flash_end)
+        return flash_->read(std::uint16_t(address - flash_start));
     return lane(opcode_latch_);
 }
 
@@ -358,6 +369,10 @@ void Bus::write_data(std::uint32_t address, unsigned width, std::uint32_t value)
     }
     case 7:
         if (width != 1) write_le(oam_, address & 0x3ff, width, value);
+        break;
+    case 14:
+        if (flash_ && width == 1 && address < flash_end)
+            flash_->write(std::uint16_t(address - flash_start), std::uint8_t(value));
         break;
     }
 }

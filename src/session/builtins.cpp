@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #include <rse/session/builtins.hpp>
-#include <rse/systems/gba/session.hpp>
+#include "gba_save.hpp"
 #include <rse/systems/nes/session.hpp>
 #include <algorithm>
 #include <array>
@@ -53,7 +53,7 @@ std::unique_ptr<Session> load(std::string_view id,const std::filesystem::path& p
     validate(id);
     if(id=="gba") {
         const auto firmware = read_gba_media(bios,true);
-        return create(id,read_gba_media(path,false),firmware);
+        return std::make_unique<FileBackedGba>(firmware,read_gba_media(path,false),path);
     }
     if(!bios.empty()) throw std::invalid_argument("A BIOS is only supported for the gba system");
     return std::make_unique<nes::Session>(nes::Cartridge::load_file(path));

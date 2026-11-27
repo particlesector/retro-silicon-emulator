@@ -79,9 +79,23 @@ The mixer produces fixed-rate 32,768 Hz stereo PCM. PWM resolution changes and a
 
 ### M25 · Flash saves and recovery
 
-- [ ] Flash tests check chip identification, program and erase commands, sector boundaries and both banks of the 128 KiB device. Writing one bank preserves the other. Machine reset preserves flash contents.
-- [ ] The application uses a per-cartridge save path and atomically replaces the last successful save on flush. A failed replacement leaves the previous file byte-identical and reports the error. A malformed save size produces an error and preserves the original file.
-- [ ] Save from the LeafGreen menu, exit the process, relaunch and choose Continue. Verify trainer, party and location. Move to a different location, save again and repeat the cold launch to verify the newer progress.
+- [x] `gba-flash-commands` checks Sanyo ID `0x1362`, unlock and program commands, bit clearing, sector endpoints, chip erase, and independent 64 KiB banks. It verifies that machine reset preserves flash contents and clears the command and bank selection state.
+- [x] `gba-flash-files` checks independent cartridge paths, dirty data across reset, and two successive raw 128 KiB saves. On Windows, denying replacement of the previous save reports an error and leaves the old file byte-identical. On Linux, a directory at the destination triggers a rename error. Retrying after removing the obstruction commits the pending image. Empty, oversized and undersized saves are rejected and preserved.
+- [x] A private LeafGreen run saved inside Oak's lab and then outside the lab in Pallet Town. Two cold launches restored the trainer, party and the location from the corresponding save.
+
+CTest passed 35/35 with the desktop enabled in Debug and Release on Windows x64 (MSVC 19.44) and Ubuntu 24.04 WSL (GCC 13.3). The independent Linux headless Release build passed 33/33. An authored flash-writing cartridge exercised both extracted Release desktop packages. Each package reopened an existing 131,072-byte save and changed the programmed byte from `0x3f` to `0x0f` across boot and reset. Both six-second smoke runs verified 20 input bindings and two Vulkan readbacks with zero starvation requests. Two successful CLI processes independently exercised first flush and reload on Windows.
+
+The private run used the M25 Release built-in session libraries on Ubuntu 24.04 WSL with GCC 13.3 and the BIOS and LeafGreen USA revision 0 SHA-1 values in the media table. A separate process for each pass replayed keypad input at frame boundaries, captured the game's screens, and flushed on normal exit. Frame counts restart at each cold boot.
+
+| Pass | Observed checkpoint |
+| --- | --- |
+| First save | At frame 23,149, the game confirmed trainer AAA's save inside Oak's lab. The party held one male Bulbasaur at level 5 with 20/20 HP. |
+| First Continue and second save | Continue displayed AAA and play time 0:04 at frame 1,373. After the recap, frame 2,076 showed AAA next to the starter table and frame 2,250 confirmed the same party. After the rival battle, AAA left the lab and confirmed overwriting the in-game save at frame 11,448. |
+| Second Continue | Continue displayed AAA and play time 0:07 at frame 1,373. Frame 2,027 restored AAA outside the lab entrance in Pallet Town. Frame 2,221 confirmed the same Bulbasaur and empty remaining party slots. |
+
+Both exit flushes produced 131,072-byte files with different SHA-256 digests. The final cold verification left the second save byte-identical.
+
+The chip completes program and erase operations immediately. The board models the byte-wide backup window and WAITCNT bus waits. The host stages complete images before replacement and commits dirty storage on orderly exit or cartridge replacement. [Flash commands and backup bus](https://mgba-emu.github.io/gbatek/#gba-cart-backup-flash-rom)
 
 ### M26 · Packaged gameplay acceptance
 

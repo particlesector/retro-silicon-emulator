@@ -71,6 +71,10 @@ void Playback::reset() {
     if(machine_)machine_->reset();
     reset_timeline();
 }
+void Playback::flush_save() {
+    std::lock_guard lock(mutex_);
+    if(machine_)machine_->flush_save();
+}
 void Playback::clear() {
     std::lock_guard lock(mutex_);
     machine_.reset();
