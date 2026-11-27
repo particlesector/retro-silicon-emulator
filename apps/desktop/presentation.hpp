@@ -16,15 +16,15 @@ inline Viewport viewport(int width,int height,session::Rational aspect={4,3}) no
 }
 class Input {
 public:
-    void key(std::uint8_t mask,bool down) noexcept {
+    void key(std::uint16_t mask,bool down) noexcept {
         if (!focused_) return;
-        if (down) keys_|=mask;else keys_&=std::uint8_t(~mask);
+        if (down) keys_|=mask;else keys_&=std::uint16_t(~mask);
     }
-    void gamepad(std::uint8_t buttons) noexcept {pad_=buttons;}
+    void gamepad(std::uint16_t buttons) noexcept {pad_=buttons;}
     void focus(bool value) noexcept {focused_=value;if (!value) keys_=0;}
     void clear() noexcept {keys_=pad_=0;}
-    [[nodiscard]] std::uint8_t buttons() const noexcept {return focused_ ? keys_|pad_ : 0;}
+    [[nodiscard]] std::uint16_t buttons() const noexcept {return focused_ ? keys_|pad_ : 0;}
 private:
-    std::uint8_t keys_{},pad_{};bool focused_{true};
+    std::uint16_t keys_{},pad_{};bool focused_{true};
 };
 } // namespace rse::desktop

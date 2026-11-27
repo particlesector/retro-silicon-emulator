@@ -13,7 +13,7 @@ struct WorkspaceOverlay {
 class Display {
 public:
     explicit Display(SDL_Window* window);
-    void draw(const Frame* frame,bool verify=false,const WorkspaceOverlay* workspace=nullptr);
+    void draw(const Frame* frame,bool verify=false,const WorkspaceOverlay* workspace=nullptr,bool gba=false);
     [[nodiscard]] const char* backend() const noexcept {return SDL_GetRendererName(renderer_.get());}
     [[nodiscard]] unsigned readbacks() const noexcept {return readbacks_;}
 private:

@@ -21,7 +21,7 @@
 
 namespace rse::desktop {
 namespace {
-enum class DialogKind { rom, profile, checkpoint, model };
+enum class DialogKind { rom, profile, checkpoint, model, bios };
 struct DialogResult {
     std::mutex mutex;
     bool pending{},ready{};
@@ -42,19 +42,22 @@ void SDLCALL selected(void* userdata,const char* const* files,int) {
     if (!files) result.error=SDL_GetError();else if (files[0]) result.path=files[0];
     result.pending=false;result.ready=true;
 }
-std::uint8_t key_mask(SDL_Scancode key) {
+std::uint16_t key_mask(SDL_Scancode key,bool gba) {
     switch (key) {
     case SDL_SCANCODE_X:return 1;case SDL_SCANCODE_Z:return 2;
     case SDL_SCANCODE_RSHIFT:return 4;case SDL_SCANCODE_RETURN:return 8;
     case SDL_SCANCODE_UP:return 16;case SDL_SCANCODE_DOWN:return 32;
     case SDL_SCANCODE_LEFT:return 64;case SDL_SCANCODE_RIGHT:return 128;
+    case SDL_SCANCODE_Q:return gba ? 0x100 : 0;
+    case SDL_SCANCODE_W:return gba ? 0x200 : 0;
     default:return 0;
     }
 }
 class Application final : public SmokeHost {
 public:
-    explicit Application(bool test,std::string_view system,DesktopLoad loader,DesktopWorkspace workspace)
-        : smoke(test),system_id(system),loader(std::move(loader)),workspace_(std::move(workspace)) {
+    explicit Application(bool test,std::string_view system,DesktopLoad loader,DesktopWorkspace workspace,
+                         const std::filesystem::path& bios)
+        : smoke(test),system_id(system),loader(std::move(loader)),workspace_(std::move(workspace)),bios_(bios) {
         if(workspace_.trainer) trainer_=std::make_unique<Trainer>(*workspace_.trainer);
         window.reset(SDL_CreateWindow("Retro Silicon Emulator",960,720,SDL_WINDOW_RESIZABLE|SDL_WINDOW_HIGH_PIXEL_DENSITY));
         require_sdl(bool(window));display=std::make_unique<Display>(window.get());
@@ -63,11 +66,25 @@ public:
         for (int i=0;i<count && !pad;++i) connect(ids[i]);SDL_free(ids);
     }
     void load(const std::filesystem::path& path) {
+        if (system_id=="gba" && bios_.empty()) {
+            pending_media_=path;
+            open(DialogKind::bios);
+            return;
+        }
+        (void)load_media(path,bios_);
+    }
+    bool load_media(const std::filesystem::path& path,const std::filesystem::path& bios) {
         try {
-            auto next=loader ? loader(path) : session::load(system_id,path);
+            auto next=loader ? loader(path) : session::load(system_id,path,bios);
             replace_session(std::move(next),path);
             model_name_.clear();
-        } catch (const std::exception& e) {error(std::string("Cannot open cartridge: ")+e.what()+"\nChoose a supported mapper-0 iNES image. The previous cartridge is retained.");}
+            return true;
+        } catch (const std::exception& e) {
+            const auto help=system_id=="gba" ? "\nSelect a GBA ROM with O and a 16 KiB BIOS with F12." :
+                "\nChoose a supported mapper-0 iNES image.";
+            error(std::string("Cannot open cartridge: ")+e.what()+help);
+            return false;
+        }
     }
     void replace_session(std::unique_ptr<session::Session> next,const std::filesystem::path& path) {
             const auto filename=path.filename().u8string();
@@ -83,7 +100,7 @@ public:
                 producer->replace(std::move(next));
                 stop_audio();playback=std::move(producer);audio=std::move(stream);
             } else {stop_audio();playback->replace(std::move(next));}
-            input.clear();visible={};running_audio=false;
+            input.clear();visible={};running_audio=false;paused=false;
             rom_=path;
             (void)SDL_SetWindowTitle(window.get(),title.c_str());redraw=true;++loads;
     }
@@ -215,11 +232,16 @@ public:
         if (e.type==SDL_EVENT_GAMEPAD_ADDED) {connect(e.gdevice.which);return;}
         if (e.type==SDL_EVENT_GAMEPAD_REMOVED && pad && SDL_GetGamepadID(pad.get())==e.gdevice.which) {pad.reset();input.gamepad(0);return;}
         if (e.type==SDL_EVENT_KEY_DOWN || e.type==SDL_EVENT_KEY_UP) {
-            const bool down=e.type==SDL_EVENT_KEY_DOWN;input.key(key_mask(e.key.scancode),down);
+            const bool down=e.type==SDL_EVENT_KEY_DOWN;input.key(key_mask(e.key.scancode,system_id=="gba"),down);
             if (down && !e.key.repeat) {
                 if (e.key.scancode==SDL_SCANCODE_ESCAPE) running=false;
                 if (e.key.scancode==SDL_SCANCODE_F5) reset();
                 if (e.key.scancode==SDL_SCANCODE_O) open();
+                if (e.key.scancode==SDL_SCANCODE_F12 && system_id=="gba") open(DialogKind::bios);
+                if (e.key.scancode==SDL_SCANCODE_P && playback->loaded()) {
+                    paused=!paused;
+                    if (paused) { input.clear();pause_audio(); }
+                }
                 workspace_key(e.key.scancode);
             }
         }
@@ -237,26 +259,32 @@ public:
         if (path) {
             modal=false;input.focus((SDL_GetWindowFlags(window.get())&SDL_WINDOW_INPUT_FOCUS)!=0);
         }
-        if (problem && !problem->empty()) error("File selection failed: "+*problem+"\nYou can also drop a .nes file into the window.");
+        if (problem && !problem->empty()) error("File selection failed: "+*problem);
         else if (path && !path->empty()) {
             try {
                 auto selection=utf8_path(*path);
                 switch(kind) {
                 case DialogKind::rom: load(selection);break;
                 case DialogKind::model: load_model(selection);break;
+                case DialogKind::bios:
+                    if (pending_media_.empty() || load_media(pending_media_,selection)) bios_=selection;
+                    break;
                 case DialogKind::profile: workspace_.profile=std::move(selection);workspace_status_.clear();break;
                 case DialogKind::checkpoint: checkpoint_=std::move(selection);workspace_status_.clear();break;
                 }
                 redraw=true;
             } catch(const std::exception& e) {workspace_status_=e.what();redraw=true;}
         }
+        if (path && kind==DialogKind::bios) pending_media_.clear();
         poll_workspace();
-        std::uint8_t buttons=0;
+        std::uint16_t buttons=0;
         if (pad && SDL_GamepadConnected(pad.get())) {
             constexpr SDL_GamepadButton map[]{SDL_GAMEPAD_BUTTON_SOUTH,SDL_GAMEPAD_BUTTON_WEST,
                 SDL_GAMEPAD_BUTTON_BACK,SDL_GAMEPAD_BUTTON_START,SDL_GAMEPAD_BUTTON_DPAD_UP,
-                SDL_GAMEPAD_BUTTON_DPAD_DOWN,SDL_GAMEPAD_BUTTON_DPAD_LEFT,SDL_GAMEPAD_BUTTON_DPAD_RIGHT};
-            for (unsigned i=0;i<8;++i) if (SDL_GetGamepadButton(pad.get(),map[i])) buttons|=1<<i;
+                SDL_GAMEPAD_BUTTON_DPAD_DOWN,SDL_GAMEPAD_BUTTON_DPAD_LEFT,SDL_GAMEPAD_BUTTON_DPAD_RIGHT,
+                SDL_GAMEPAD_BUTTON_LEFT_SHOULDER,SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER};
+            const unsigned count=system_id=="gba" ? std::size(map) : 8;
+            for (unsigned i=0;i<count;++i) if (SDL_GetGamepadButton(pad.get(),map[i])) buttons|=1<<i;
         }
         input.gamepad(buttons);
         playback->input(default_controls(system_id,input.buttons()));
@@ -275,13 +303,13 @@ public:
             error("Execution stopped: "+problem+"\nPress O to choose another cartridge.");
             if(smoke)throw std::runtime_error(problem);
         }
-        const bool playing=playback->loaded() && !minimized && !modal;
+        const bool playing=playback->loaded() && !minimized && !modal && !paused;
         playback->active(playing);
         redraw=playback->update_frame(visible)||redraw;
         if (!minimized && (redraw || verify_next)) {
             const auto workspace=workspace_.visible ? std::optional{overlay()} : std::nullopt;
             display->draw(playback->loaded()?&visible:nullptr,smoke && verify_next,
-                workspace ? &*workspace : nullptr);
+                workspace ? &*workspace : nullptr,system_id=="gba");
             redraw=false;
         }
         if (playing && playback->has_audio() && !running_audio && playback->ready()) {require_sdl(SDL_ResumeAudioStreamDevice(audio.get()));running_audio=true;}
@@ -313,9 +341,13 @@ public:
             dialog->pending=true;dialog->kind=kind;}
         modal=true;input.focus(false);pause_audio();
         static const SDL_DialogFileFilter filters[]{
-            {"NES cartridge","nes"},{"Task profile","json"},{"PPO checkpoint","zip"},{"ONNX policy bundle","rsep"}};
+            {"NES cartridge","nes"},{"Task profile","json"},{"PPO checkpoint","zip"},{"ONNX policy bundle","rsep"},
+            {"GBA BIOS","bin;rom"}};
+        static const SDL_DialogFileFilter gba_rom{"GBA cartridge","gba"};
+        const auto* filter=kind==DialogKind::rom && system_id=="gba" ?
+            &gba_rom : &filters[static_cast<unsigned>(kind)];
         SDL_ShowOpenFileDialog(selected,new std::shared_ptr<DialogResult>(dialog),window.get(),
-            &filters[static_cast<unsigned>(kind)],1,nullptr,false);
+            filter,1,nullptr,false);
     }
     void report(std::uint64_t elapsed_ms,const SmokeMetrics& metrics) const {
         const auto stats=playback->stats();
@@ -339,7 +371,8 @@ public:
     [[nodiscard]] bool has_machine() const {return playback->loaded();}
     [[nodiscard]] SmokeObservation observation() const override {
         return {running,playback->loaded(),input.buttons(),playback->tick(),visible.number,
-                playback->stats().samples,loads,resets,errors,display->readbacks(),starvation.load(),visible.pixels};
+                playback->stats().samples,loads,resets,errors,display->readbacks(),starvation.load(),visible.pixels,
+                visible.format,running_audio};
     }
     [[nodiscard]] std::optional<std::uint8_t> inspect_memory(std::uint16_t address) const override {
         std::optional<std::uint8_t> value;
@@ -367,7 +400,7 @@ private:
     std::string system_id;
     DesktopLoad loader;
     DesktopWorkspace workspace_;
-    std::filesystem::path rom_,checkpoint_;
+    std::filesystem::path rom_,checkpoint_,bios_,pending_media_;
     std::unique_ptr<Trainer> trainer_;
     std::string model_name_,workspace_status_;
     std::uint32_t watch_{0x10};
@@ -394,21 +427,21 @@ private:
     std::unique_ptr<Playback> playback;
     std::uint64_t last_step{},max_step_work_us{},max_loop_gap_us{};
     std::uint64_t max_pump_work_us{},max_sleep_us{};
-    bool minimized{},running_audio{},modal{},redraw{true};
+    bool minimized{},running_audio{},modal{},paused{},redraw{true};
 };
 
 }
 } // namespace rse::desktop
 int run_desktop(const std::filesystem::path& cartridge,unsigned seconds,bool smoke,std::string_view system,
-                DesktopLoad loader,DesktopFinish finish,DesktopWorkspace workspace) {
+                DesktopLoad loader,DesktopFinish finish,DesktopWorkspace workspace,const std::filesystem::path& bios) {
     using namespace rse::desktop;
     try {
         const bool autostart=workspace.autostart;
-        Application app(smoke,system,std::move(loader),std::move(workspace));if (smoke) app.step();
+        Application app(smoke,system,std::move(loader),std::move(workspace),bios);if (smoke) app.step();
         if (!cartridge.empty()) app.load(cartridge);
         if ((smoke || finish) && !app.has_machine()) throw std::runtime_error("Requested session could not be loaded");
         if(autostart) app.start_trainer(false);
-        std::unique_ptr<Smoke> script;if (smoke) script=std::make_unique<Smoke>(cartridge);
+        std::unique_ptr<Smoke> script;if (smoke) script=std::make_unique<Smoke>(cartridge,system=="gba");
         const auto start=SDL_GetTicks();
         while (app.is_running() && (!seconds || SDL_GetTicks()-start<std::uint64_t(seconds)*1000)) {
             app.pump();if(!app.is_running())break;

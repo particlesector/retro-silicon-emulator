@@ -79,6 +79,11 @@ a 3:2 display aspect. The first frame publishes at tick 197,120, followed by
 one every 280,896 ticks. `run_frame()` advances to the next publication, and
 `convert_video()` expands BGR555 to RGBA.
 
+The session produces 32,768 Hz interleaved stereo S16 PCM. Each sample frame
+represents one 512-clock interval. Drain it using `take_audio()` during long
+advances to stay within the 65,536-sample queue bound. Reset clears the queue,
+sound generators, and Direct Sound FIFOs.
+
 `controller-1` accepts `a`, `b`, `select`, `start`, `right`, `left`, `up`,
 `down`, `r`, and `l`. The complete pressed set takes effect on its scheduled
 tick before a bus read completing on the same tick. The board can pause an
@@ -92,7 +97,8 @@ for timing scope and the private boot procedure.
 ## Application integration
 
 The default system remains `nes-ntsc`. The CLI accepts `--system gba --bios <path>`
-with `--ticks` or `--frames` for headless GBA runs. Desktop playback uses `nes-ntsc`.
+with `--ticks` or `--frames` for headless GBA runs. Launch the desktop with
+`--system gba` and supply `--bios <path>` or select firmware from the window.
 Unknown IDs fail explicitly before media/device access.
 The CLI option follows the existing run/count arguments. Existing NES commands,
 exit codes and `rse.run.v1` JSON retain their meanings; `apps/cli/nes_output.hpp`

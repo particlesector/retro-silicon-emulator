@@ -14,7 +14,7 @@ Display::Display(SDL_Window* window) {
         SDL_GetHintBoolean(SDL_HINT_RENDER_VSYNC,true) ? 1 : 0));
 
 }
-void Display::draw(const Frame* frame,bool verify,const WorkspaceOverlay* workspace) {
+void Display::draw(const Frame* frame,bool verify,const WorkspaceOverlay* workspace,bool gba) {
     auto* r=renderer_.get();int width{},height{};
     require_sdl(SDL_SetRenderLogicalPresentation(r,0,0,SDL_LOGICAL_PRESENTATION_DISABLED));
     require_sdl(SDL_GetRenderOutputSize(r,&width,&height));
@@ -61,9 +61,13 @@ void Display::draw(const Frame* frame,bool verify,const WorkspaceOverlay* worksp
         require_sdl(SDL_SetRenderDrawColor(r,150,190,255,255));
         require_sdl(SDL_RenderDebugText(r,32,40,"Retro Silicon Emulator"));
         require_sdl(SDL_SetRenderDrawColor(r,210,220,235,255));
-        constexpr const char* lines[]{"Open a cartridge to start.","","O / Ctrl+O    Open cartridge",
-            "Or drop a .nes file here.","","X / Z         A / B","Arrow keys    Directions",
+        const char* lines[]{"Open a cartridge to start.","","O / Ctrl+O    Open cartridge",
+            gba ? "Or drop a .gba file here." : "Or drop a .nes file here.","","X / Z         A / B","Arrow keys    Directions",
             "Enter         Start","Right Shift   Select","","F1 AI workspace   F5 Reset   Esc Exit"};
+        if(gba) {
+            lines[9]="Q / W         L / R";
+            lines[10]="F12 BIOS   P Pause   F5 Reset   Esc Exit";
+        }
         float y=76;for (auto* line:lines) {require_sdl(SDL_RenderDebugText(r,32,y,line));y+=18;}
     }
     if(workspace && panel>0) {

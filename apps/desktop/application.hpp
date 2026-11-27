@@ -20,4 +20,4 @@ struct DesktopWorkspace {
 };
 int run_desktop(const std::filesystem::path& cartridge,unsigned seconds,bool smoke,
                 std::string_view system="nes-ntsc",DesktopLoad loader={},DesktopFinish finish={},
-                DesktopWorkspace workspace={});
+                DesktopWorkspace workspace={},const std::filesystem::path& bios={});
