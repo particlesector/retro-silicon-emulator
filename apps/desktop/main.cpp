@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "application.hpp"
 #include "audio_player.hpp"
+#include "gba_replay.hpp"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <charconv>
@@ -14,6 +15,7 @@
 int main(int argc,char** argv) {
     unsigned seconds=0;bool audio=false,smoke=false;std::filesystem::path path;std::string_view system="nes-ntsc";
     std::filesystem::path bios;
+    std::filesystem::path gba_replay, gba_captures;
     DesktopLoad loader;
     DesktopFinish finish;
     DesktopWorkspace workspace;
@@ -27,6 +29,7 @@ int main(int argc,char** argv) {
                  <<"       rse-desktop --audio cartridge.nes [--seconds <1..3600>]\n"
                  <<"       rse-desktop --smoke fixture.nes [--seconds <5..3600>]\n"
                  <<"       rse-desktop [cartridge.gba] --system gba [--bios bios.bin]\n"
+                 <<"       GBA verification: --gba-replay FILE [--gba-captures DIR] --seconds COUNT\n"
                  <<"       Optional: --system nes-ntsc (default)\n"
 #ifdef RSE_POLICY_ENABLED
                  <<"       Optional: --model FILE --replay FILE [--provider cpu|cuda|auto]\n"
@@ -43,6 +46,8 @@ int main(int argc,char** argv) {
             if ((arg=="--audio" || arg=="--smoke") && i==1) {audio=arg=="--audio";smoke=arg=="--smoke";}
             else if (arg=="--system" && i+1<argc) system=argv[++i];
             else if (arg=="--bios" && i+1<argc && bios.empty()) bios=utf8_path(argv[++i]);
+            else if (arg=="--gba-replay" && i+1<argc && gba_replay.empty()) gba_replay=utf8_path(argv[++i]);
+            else if (arg=="--gba-captures" && i+1<argc && gba_captures.empty()) gba_captures=utf8_path(argv[++i]);
             else if (arg=="--workspace") workspace.visible=true;
             else if (arg=="--trainer-autostart") workspace.autostart=true;
             else if (arg=="--trainer-python" && i+1<argc) trainer.python=utf8_path(argv[++i]);
@@ -113,6 +118,11 @@ int main(int argc,char** argv) {
         } else if(!replay_path.empty() || provider!="auto")
             throw std::invalid_argument("Replay and provider require a model");
 #endif
+        if (!gba_replay.empty()) {
+            if (system!="gba" || path.empty() || bios.empty() || !seconds || smoke || audio || configured || workspace.visible)
+                throw std::invalid_argument("GBA replay requires a GBA cartridge, BIOS and desktop duration");
+            rse::desktop::configure_gba_replay(gba_replay,gba_captures,bios,loader,finish);
+        } else if (!gba_captures.empty()) throw std::invalid_argument("Capture directory requires a GBA replay");
     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 2;}
     if (!SDL_Init(SDL_INIT_VIDEO|SDL_INIT_GAMEPAD)) {std::cerr<<SDL_GetError()<<'\n';return 1;}
     const int result=audio ? play_audio(path,seconds,system,bios) :

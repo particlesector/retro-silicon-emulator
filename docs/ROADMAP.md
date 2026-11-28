@@ -1,6 +1,6 @@
 # Development roadmap
 
-The NTSC NES and AI-enabled MVPs are complete. The next system is the Game Boy Advance. Its first release goal is single-player LeafGreen through the Boulder Badge (M21–M26). Its second is a persistent FireRed–LeafGreen trade between two players on a LAN (M27–M30). [GBA implementation and acceptance milestones](GBA_ROADMAP.md)
+The NTSC NES and AI-enabled MVPs are complete. The Game Boy Advance single-player target is verified through the Boulder Badge in LeafGreen on Windows and Linux (M21–M26). The next GBA target is a persistent FireRed–LeafGreen trade between two players on a LAN (M27–M30). [GBA implementation and acceptance milestones](GBA_ROADMAP.md)
 
 | Completed | Delivered | Evidence |
 | --- | --- | --- |

@@ -15,7 +15,7 @@ Playback::Playback(SDL_AudioStream* stream):stream_(stream) {
             throw std::runtime_error(SDL_GetError());
         if(device.freq<=0 || frames<=0)
             throw std::runtime_error("Audio device reported an invalid period");
-        // One negotiated device request plus the existing 2 ms source margin.
+        // Use the negotiated device request to size the source queue.
         device_rate_=unsigned(device.freq);device_frames_=unsigned(frames);
     }
     worker_=std::thread([this]{produce();});
@@ -56,7 +56,11 @@ void Playback::replace(std::unique_ptr<session::Session> machine) {
         if(!format.sample_rate || !format.channels || format.channels>8 ||
            format.sample_rate>384000 || format.samples!=session::SampleFormat::signed16_native)
             throw std::invalid_argument("Unsupported session audio format");
-        const auto period=(std::uint64_t(device_frames_)*format.sample_rate+device_rate_-1)/device_rate_;
+        auto period=(std::uint64_t(device_frames_)*format.sample_rate+device_rate_-1)/device_rate_;
+#ifdef SDL_PLATFORM_WINDOWS
+        // The one-period queue underruns during sustained Windows GBA play.
+        if(info.id=="gba")period*=2;
+#endif
         const auto margin=(std::uint64_t(format.sample_rate)*timing::source_margin_ms+999)/1000;
         target=unsigned((period+margin)*format.channels*sizeof(std::int16_t));
         SDL_AudioSpec spec{SDL_AUDIO_S16,int(format.channels),int(format.sample_rate)};
