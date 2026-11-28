@@ -1,8 +1,8 @@
 # Game Boy Advance roadmap
 
-The GBA has two planned release goals. The `gba` built-in supports headless and desktop playback with video, keypad input and stereo audio. The default system is `nes-ntsc`.
+The `gba` built-in supports headless and desktop playback with video, keypad input and stereo audio. The default system is `nes-ntsc`.
 
-1. **Single-player LeafGreen (M21–M26).** A player earns the Boulder Badge on the Windows and Linux desktop and can continue from the in-game save after relaunch.
+1. **Single-player LeafGreen (M21–M26, verified).** Both the Windows and Linux desktop packages earned the Boulder Badge and restored the in-game save after relaunch.
 2. **Two-player LAN trading (M27–M30).** Two people on separate computers trade through the games’ cable trading room, one playing FireRed and one playing LeafGreen. Each keeps the received Pokémon in their own save after both emulators restart.
 
 ## Media and test inputs
@@ -99,9 +99,73 @@ The chip completes program and erase operations immediately. The board models th
 
 ### M26 · Packaged gameplay acceptance
 
-- [ ] Extract Release packages on Windows and Linux. On each platform, load external media, start with a fresh save and play through indoor/outdoor transitions, menus and multiple battles. Record session duration and verify zero audio starvation during a ten-minute uninterrupted gameplay interval.
-- [ ] On each platform, defeat the first Gym Leader, save, close the application and relaunch. Continue must restore the Boulder Badge, party and saved location. Record the observed results and any visual, input, audio or save defects.
-- [ ] Run the GBA headless fixtures and frozen NES regressions on both platforms and compare deterministic outputs. Publish the tested build, configurations, media digests, gameplay checkpoints and known limitations. A defect preventing any listed checkpoint keeps the milestone open.
+- [x] Both extracted Release packages started with fresh cartridge paths, played through indoor and outdoor areas, menus and multiple battles, and produced byte-identical saves at the same checkpoints. The uninterrupted endurance repeat ran 675 seconds with zero starvation requests on each platform.
+- [x] Both packages defeated Brock, saved inside Pewter Gym and closed. A fresh process on each platform restored the Boulder Badge, party and Gym location through Continue.
+- [x] The GBA headless fixtures and frozen NES regressions passed on both platforms with matching deterministic outputs. The tested packages, configurations, media, gameplay checkpoints and observed limits are recorded below.
+
+The M26 test uses the USA revision 0 LeafGreen and 16 KiB BIOS SHA-1 values
+in the media table. The Windows and Linux Release packages use the same
+[frame-timed keypad script format](DESKTOP.md#game-boy-advance) on independent
+cartridge paths. Captures export the adapter's 240×160 RGB pixels at designated
+VBlank boundaries. The desktop presents the frames through Vulkan and
+consumes PCM through SDL. Starvation counts measure the SDL dummy backend.
+The packages used SDL 3.4.14. Linux used X11 under Xvfb and the Mesa software
+Vulkan driver. Windows ran natively on build 26300.
+The M26 desktop code was built on the merged M25 baseline `9124eb0`.
+
+| Extracted Release package | ZIP SHA-256 |
+| --- | --- |
+| Windows AMD64 | `3cfb76e92f052c1c4f8e16993eab1a33863a20f944c9169b7ebfc259a4300d32` |
+| Linux x86-64 | `761eb1738f9686b48f9ec91f1fa2dc168ed91f05d0fa8e00bdf03bc7d2219134` |
+
+The first Windows run with the M25 queue size reported 25 starvation requests
+over 410 seconds. Windows GBA now queues two device periods plus 2 ms. A
+repeat of the fresh-save segment ran 405 seconds with no starvation and
+produced the same save. Concurrent Debug builds still caused underruns in
+the separate rival-battle run.
+
+| Packaged segment | Windows elapsed / starvation requests | Linux elapsed / starvation requests |
+| --- | ---: | ---: |
+| Fresh game through Oak's lab save | 405.003 s / 0 | 410.018 s / 0 |
+| Rival battle through outdoor Pallet Town save | 202.002 s / 885 during concurrent builds | 205.025 s / 0 |
+| Route 1, Oak's Parcel and Viridian Pokémon Center save | 804.004 s / 3 | 804.011 s / 15 |
+| Route 1 endurance repeat from the outdoor Pallet Town save | 675.001 s / 0 | 675.008 s / 0 |
+| Viridian to the Route 2 gate and Forest trainer save | 705.022 s / 0 | 705.010 s / 0 |
+| Forest north exit through the Boulder Badge and Gym save | 385.001 s / 0 | 385.017 s / 0 |
+| Cold Continue from the Gym save | 55.001 s / 0 | 55.020 s / 0 |
+
+The endurance repeat and subsequent gameplay runs used
+`SDL_AUDIO_DEVICE_SAMPLE_FRAMES=4096` and no concurrent builds. The Windows
+source queue target was 24,616 bytes and the Linux target was 12,440 bytes.
+The 39,200-frame endurance script resumed playable
+control at frame 2,027 and exercised travel, menus and battles through the end
+of the interval. The larger device period trades latency for scheduling
+headroom. These counts cover the digital stream to SDL's dummy device.
+[SDL device buffer hint](https://wiki.libsdl.org/SDL3/SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES)
+
+The Gym segment began from the save written by that platform's Forest run.
+Bulbasaur used Vine Whip against Brock's Geodude and Onix. Frame 19,561
+showed the Boulder Badge award and level 13 Bulbasaur at 36/36 HP. Frame
+21,455 showed the Pewter City save prompt with one badge. Both processes
+flushed byte-identical 131,072-byte saves after the in-game save completed.
+
+After closing and reopening each package, Continue showed trainer AAA and
+one badge at frame 1,373. Frame 2,027 restored AAA standing in front of Brock
+inside Pewter Gym, frame 2,243 showed only the original Bulbasaur at level 13
+and 36/36 HP, and frame 2,557 showed the Boulder Badge on the Trainer Card.
+The cold checks left the badge saves byte-identical. All 78 gameplay
+checkpoint captures matched across platforms, with no visual, input or save
+defect observed on the tested route.
+
+CTest passed 37/37 in Debug and Release on Windows x64 (MSVC 19.44) and
+Ubuntu 24.04 WSL (GCC 13.3). The independent Release builds with the desktop
+disabled passed 33/33 on both platforms. The three frozen NES baseline
+reports matched in tick and sample counts and state, event, frame and PCM
+hashes. The GBA fixtures matched the pinned frame and PCM hashes above.
+Both platforms repeated the private cold boot pair at tick 75,690,241 with
+opcode `0xea00007f` at `0x08000000`.
+Both extracted packages also verified 20 keyboard and gamepad bindings,
+two Vulkan readbacks and one reset in the authored six-second smoke test.
 
 ## Level 2 · Two-player LAN trading
 

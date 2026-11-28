@@ -64,9 +64,26 @@ rse-gba-audio-tests generate gba-smoke
 rse-desktop --smoke gba-smoke.gba --system gba --bios gba-smoke.bin --seconds 6
 ```
 
+To replay gameplay through the packaged renderer and audio producer, supply
+a keypad script and a duration that gives the script time to finish.
+
+```sh
+rse-desktop "game.gba" --system gba --bios "gba_bios.bin" \
+  --gba-replay route.txt --gba-captures captures --seconds 620
+```
+
+Each script line has a decimal frame count, a hexadecimal GBA keypad mask
+and a checkpoint name. Use `-` to skip the capture. Blank lines and lines
+starting with `#` are ignored. Masks use KEYINPUT bit order with set bits
+for pressed buttons. For example, `2 8 -` holds Start for two frames and
+`180 0 title-menu` releases it and captures the frame at the end of the
+180-frame wait. Named checkpoints require a capture directory. PPM captures
+are exported on exit. Replay uses its recorded keypad state and leaves a
+partially completed run's save uncommitted.
+
 ## Presentation and audio
 
-SDL3 uses its Vulkan renderer to present the latest completed frame at the aspect ratio supplied by the session. The NES adapter supplies an approximate NTSC palette and 4:3 aspect. The producer advances the machine in roughly 1 ms chunks and targets one audio device period plus 2 ms of queued source PCM. The GUI can wait for presentation while emulation continues. VSync defaults on. The M20 RTX 5080 training comparison used `SDL_RENDER_VSYNC=0`, which can introduce tearing.
+SDL3 uses its Vulkan renderer to present the latest completed frame at the aspect ratio supplied by the session. The NES adapter supplies an approximate NTSC palette and 4:3 aspect. The producer advances the machine in roughly 1 ms chunks and targets one audio device period plus 2 ms of queued source PCM. Windows GBA playback queues two device periods plus 2 ms to absorb interruptions observed during extended gameplay. The GUI can wait for presentation while emulation continues. VSync defaults on. The M20 RTX 5080 training comparison used `SDL_RENDER_VSYNC=0`, which can introduce tearing.
 
 ## Audio-only playback
 
